@@ -11,7 +11,7 @@
 #define CMT_CACHELINE CACHELINE
 
 #define _cache_aligned \
-__attribute__(align(CACHELINE))
+__attribute__((aligned(CACHELINE)))
 
 #define CMT_PAGESIZE 4096
 
