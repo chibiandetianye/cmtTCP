@@ -145,4 +145,6 @@ int _CAS2(volatile long* ptr, long* cmp1, long* cmp2, long val1, long val2)
 #define PAUSE()
 #endif
 
+#define	barrier()	__asm__ __volatile__ ("" : : : "memory")
+
 #endif /** _ATOMIC_INCLUDE_H_ */

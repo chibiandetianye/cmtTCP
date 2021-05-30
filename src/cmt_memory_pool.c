@@ -5,10 +5,13 @@
 #include<stdlib.h>
 #include<stdio.h>
 #include<string.h>
+#include<pthread.h>
 
 #include"mem_pool.h"
 #include"global.h"
 #include"cmt_errno.h"
+
+__pthread cmt_pool* pool = NULL;
 
 always_inline void*
 aligned_malloc(size_t required_bytes, size_t alignment) {
@@ -33,7 +36,6 @@ aligned_free(void* p2) {
 
 cmt_pool_t*
 cmt_create_pool(size_t size) {
-    cmt_pool_t* pool;
     size_t totalSize;
     cmt_pool_control_block_t ctb;
     size_t header_size;
@@ -63,6 +65,23 @@ cmt_create_pool(size_t size) {
 
     memset(pool->smallbins, 0, sizeof(cmt_pool_t) * TOTAL_BINS);
 
+    return pool;
+}
+
+cmt_pool_t* 
+get_cmt_pool() {
+    if (pool == NULL) {
+        size_t size = CMT_DEFAULT_POOL_SIZE;
+        return cmt_create_pool(size);
+    }
+    return pool;
+}
+
+cmt_pool_t*
+get_cmt_pool_s(size_t size) {
+    if (NULL == pool) {
+        return cmt_create_pool(size);
+    }
     return pool;
 }
 

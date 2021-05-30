@@ -89,6 +89,16 @@ typedef struct cmt_pool {
     cmt_pool_bin_t              smallbins[TOTAL_BINS]; //management of small chunk
 } cmt_pool_t;
 
+/** \brief get a thread private memory pool */
+cmt_pool_t* get_cmt_pool();
+
+/** \brief get a specified size thead private memory pool 
+    @param size total size of memory pool
+            if size < CMT_DEFAULT_POOL_SIZE, the size will be up to
+            CMT_DEFAULT_POOL_SIZE
+*/
+cmt_pool_t* get_cmt_pool_s(size_t size);
+
 /** \brief create the memory pool
     -----------------------------------------------------------
     @param size total size of memory pool

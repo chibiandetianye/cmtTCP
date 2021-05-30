@@ -26,6 +26,8 @@
 
 /**	\brief structure of eth table */
 typedef struct eth_table {
+	volatile int8_t flag; //wthether mark initing completing
+
 	char dev_name[128];
 	int ifindex;
 	int stat_print;
@@ -37,6 +39,7 @@ typedef struct eth_table {
 
 /** \brief structure of arp table */
 typedef struct arp_table {
+	volatile entry_nums;
 	tailq_head_t* entry;
 	tailq_head_t* gateway;
 } arp_table_t;

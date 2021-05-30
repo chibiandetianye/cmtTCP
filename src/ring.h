@@ -54,7 +54,6 @@ typedef struct cmt_ring {
     The new ring size is set to "count", which must be a
     power of 2
     ---------------------------------------------------------
-    @param pool memory pool to allocate memory
     @param name the name of the ring
     @param count the size of the ring
     @param sp mark single producer
@@ -64,15 +63,14 @@ typedef struct cmt_ring {
             EINVAL count is not pow of 2
             ENONMEM no more memory unused
  */
-cmt_ring_t* cmt_ring_create(cmt_pool_t* pool, const char* name, unsigned int count,
+cmt_ring_t* cmt_ring_create(const char* name, unsigned int count,
                             uint32_t sp, uint32_t sc);
 
 /** \brief de-allocte all memory used by ring
     ---------------------------------------------------------
-    @param pool memory pool
     @param ring ring to free
  */
-void cmt_ring_destroy(cmt_pool_t* pool, cmt_ring_t* ring);
+void cmt_ring_destroy(cmt_ring_t* ring);
 
 always_inline void
 _cmt_ring_enqueue_elms_32(cmt_ring_t* r, const uint32_t size,

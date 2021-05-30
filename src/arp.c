@@ -1,11 +1,20 @@
 #include<stdint.h>
 #include<pthread.h>
+/** for user space rcu */
+#include<urcu/arch.h>
+#include<urcu-pointer.h>
+#include<urcu.h>
+#include<urcu-qsbr.h>
 
 #include"arp.h"
 #include"queue.h"
 #include"config.h"
 #include"cmtTCP.h"
 #include"rss.h"
+#include"global.h"
+#include"cmt_errno.h"
+#include"atomic.h"
+#include"cmt_memory_pool.h"
 
 #define ARP_PAD_LEN 18			/* arp pad length to fit 64B packet size */
 #define ARP_TIMEOUT_SEC 1		/* 1 second arp timeout */
@@ -26,11 +35,15 @@ struct arphdr
 	uint8_t pad[ARP_PAD_LEN];
 } _packed;
 
+/** \brief record arp request queue
+*/
 typedef struct arp_queue_entry {
-	list_node_t* arp_link;
-	uint32_t ip;
-	int nif_out;
-	uint32_t ts_out;
+	volatile slist_node_t* arp_link;	/* next arp request queue element */
+	uint32_t ip; /*	destination ip requested */
+	int nif_out;	/* no. nic interface out */
+	uint32_t ts_out;	/* time recorded at first request */
+
+	volatile uint8_t flag _cache_aligned; /* whether mark expire */
 } arp_queue_entry_t;
 
 enum arp_hrd_format
@@ -44,39 +57,48 @@ enum arp_opcode
 	arp_op_reply = 2,
 };
 
+/** \brief structure of managing the request list */
 typedef struct arp_manager
 {
 	arp_queue_entry_t* working_list;
-	pthread_spinlock_t lock;
+	//pthread_spinlock_t lock;
 } arp_manager_t;
 
 extern cmttcp_config_t config;
 
-arp_manager_t g_parm[CORE_NUMS];
+arp_manager_t g_arpm;
 
+/** \brief init arp table and arp manager */
 int
-InitARPTable()
+init_ARP_table()
 {
 	config.arp.entries = 0;
 	size_t i;
 
+	cmt_pool_t* pool_ = get_cmt_pool();
 	config.arp.entry = (arp_entry_t*)
-		calloc(MAX_ARPENTRY, sizeof(arp_entry_t));
-	if (config.arp.entry == NULL) {
+		cmt_pcalloc(pool_, sizeof(arp_entry_t) * MAX_ARPENTRY);
+		
+	if (unlikely(config.arp.entry == NULL)) {
 		perror("calloc");
+		cmt_errno = ENONMEM;
 		return -1;
 	}
 
-	for (i = 0; i < CORE_NUMS; ++i) {
-		tailq_init(&g_parm[i].working_list);
-		pthread_spin_init(&g_parm[i].lock, NULL);
+	g_arpm.working_list = cmt_palloc(pool, sizeof(arp_queue_entry_t));
+	if (unlikely(g_arpm.working_list)) {
+		cmt_errno = ENONMEM;
+		free(config.arp.entry);
+		return -1;
 	}
+	g_arpm.working_list->arp_link = NULL;
 	
 	return 0;
 }
 
+/** get hardware address through ip address */
 unsigned char*
-GetHWaddr(uint32_t ip)
+get_HW_addr(uint32_t ip)
 {
 	int i;
 	unsigned char* haddr = NULL;
@@ -90,9 +112,9 @@ GetHWaddr(uint32_t ip)
 	return haddr;
 }
 
-/*----------------------------------------------------------------------------*/
+/** get destination hardware in arp table through destination address */
 unsigned char*
-GetDestinationHWaddr(uint32_t dip, uint8_t is_gateway)
+get_destination_HW_addr(uint32_t dip, uint8_t is_gateway)
 {
 	unsigned char* d_haddr = NULL;
 	int prefix = 0;
@@ -124,16 +146,17 @@ GetDestinationHWaddr(uint32_t dip, uint8_t is_gateway)
 
 	return d_haddr;
 }
-/*----------------------------------------------------------------------------*/
+
+/** \brief send a arp message */
 static int
-ARPOutput(struct mtcp_manager* mtcp, int nif, int opcode,
-	uint32_t dst_ip, unsigned char* dst_haddr, unsigned char* target_haddr)
+ARP_output(int nif, int opcode, uint32_t dst_ip, 
+	unsigned char* dst_haddr, unsigned char* target_haddr)
 {
 	if (!dst_haddr)
 		return -1;
 
 	/* Allocate a buffer */
-	struct arphdr* arph = (struct arphdr*)EthernetOutput(mtcp,
+	struct arphdr* arph = (struct arphdr*)EthernetOutput(
 		ETH_P_ARP, nif, dst_haddr, sizeof(struct arphdr));
 	if (!arph) {
 		return -1;
@@ -165,11 +188,12 @@ ARPOutput(struct mtcp_manager* mtcp, int nif, int opcode,
 
 	return 0;
 }
-/*----------------------------------------------------------------------------*/
+
+/** \brief register the arp entry */
 int
-RegisterARPEntry(uint32_t ip, const unsigned char* haddr)
+register_ARP_entry(uint32_t ip, const unsigned char* haddr)
 {
-	int idx = config.arp.entries;
+	int idx = FAAcs(&config.arp.entry_nums, 1);
 
 	config.arp.entry[idx].prefix = 32;
 	config.arp.entry[idx].ip = ip;
@@ -181,107 +205,141 @@ RegisterARPEntry(uint32_t ip, const unsigned char* haddr)
 		config.arp.entry[idx].ip_mask) ==
 		config.arp.entry[idx].ip_masked) {
 		config.arp.gateway = &config.arp.entry[idx];
-		TRACE_CONFIG("ARP Gateway SET!\n");
+		//TRACE_CONFIG("ARP Gateway SET!\n");
 	}
 
-	config.arp.entries = idx + 1;
+	barrier();
+	config.arp.entry[idx].flag = 1;
+	barrier();
 
-	TRACE_CONFIG("Learned new arp entry.\n");
+	//TRACE_CONFIG("Learned new arp entry.\n");
 	PrintARPTable();
 
 	return 0;
 }
-/*----------------------------------------------------------------------------*/
-void
-RequestARP(mtcp_manager_t mtcp, uint32_t ip, int nif, uint32_t cur_ts)
+/** \brief set a request in arpm wokring list */
+int
+request_ARP(uint32_t ip, int nif, uint32_t cur_ts)
 {
-	struct arp_queue_entry* ent;
+	arp_queue_entry_t* ent;
 	unsigned char haddr[ETH_ALEN];
 	unsigned char taddr[ETH_ALEN];
+	int success;
+	arp_queue_entry_t* head = g_arpm.working_list;
+	arp_queue_entry_t* old_head;
+	cmt_pool* pool_;
 
-	pthread_mutex_lock(&g_arpm.lock);
 	/* if the arp request is in progress, return */
-	TAILQ_FOREACH(ent, &g_arpm.list, arp_link) {
-		if (ent->ip == ip) {
-			pthread_mutex_unlock(&g_arpm.lock);
+	rcu_register_thread();
+	rcu_read_lock();
+	for (ent = rcu_derefence(head->arp_link)); 
+		ent;
+		ent = rcu_derefence(tailq_next((ent))) {
+		if (ent->ip == ip && ent->flag) {
+			rcu_read_unlock();
+			rcu_quiescent_state();
 			return;
 		}
 	}
+	rcu_read_unlock();
+	rcu_quiescent_state();
+	rcu_unregister_thread();
 
-	ent = (struct arp_queue_entry*)calloc(1, sizeof(struct arp_queue_entry));
+	pool = get_cmt_pool();
+	ent = (struct arp_queue_entry*)cmt_pcalloc(pool, sizeof(struct arp_queue_entry));
+	if (unlikely(ent == NULL)) {
+		cmt_errno = ENONMEM;
+		return -1;
+	}
 	ent->ip = ip;
 	ent->nif_out = nif;
 	ent->ts_out = cur_ts;
-	TAILQ_INSERT_TAIL(&g_arpm.list, ent, arp_link);
-	pthread_mutex_unlock(&g_arpm.lock);
+	ent->flag = 1;
+	
+	do {
+		old_head = head->arp_link;
+		ent->arp_link = old_head;
+		success = CASra(head->arp_link, old_head, ent);
+	} while (success != 0)
+
 
 	/* else, broadcast arp request */
 	memset(haddr, 0xFF, ETH_ALEN);
 	memset(taddr, 0x00, ETH_ALEN);
-	ARPOutput(mtcp, nif, arp_op_request, ip, haddr, taddr);
+	ARP_output(nif, arp_op_request, ip, haddr, taddr);
+	return 0;
 }
-/*----------------------------------------------------------------------------*/
+
+/**	\brief process arp packet */
 static int
-ProcessARPRequest(mtcp_manager_t mtcp,
+process_ARP_request(mtcp_manager_t mtcp,
 	struct arphdr* arph, int nif, uint32_t cur_ts)
 {
 	unsigned char* temp;
 
 	/* register the arp entry if not exist */
-	temp = GetDestinationHWaddr(arph->ar_sip, 0);
+	temp = get_destination_HW_addr(arph->ar_sip, 0);
 	if (!temp) {
 		RegisterARPEntry(arph->ar_sip, arph->ar_sha);
 	}
 
 	/* send arp reply */
-	ARPOutput(mtcp, nif, arp_op_reply, arph->ar_sip, arph->ar_sha, NULL);
+	ARP_output(nif, arp_op_reply, arph->ar_sip, arph->ar_sha, NULL);
 
 	return 0;
 }
-/*----------------------------------------------------------------------------*/
+
+/**	\brief process arp reply */
 static int
-ProcessARPReply(mtcp_manager_t mtcp, struct arphdr* arph, uint32_t cur_ts)
+process_ARP_reply(struct arphdr* arph, uint32_t cur_ts)
 {
 	unsigned char* temp;
 	struct arp_queue_entry* ent;
+	struct arp_queue_entry* old, next;
+	int success;
 
 	/* register the arp entry if not exist */
-	temp = GetDestinationHWaddr(arph->ar_sip, 0);
+	temp = get_destination_HW_addr(arph->ar_sip, 0);
 	if (!temp) {
-		RegisterARPEntry(arph->ar_sip, arph->ar_sha);
+		register_ARP_entry(arph->ar_sip, arph->ar_sha);
 	}
 
-	/* remove from the arp request queue */
-	pthread_mutex_lock(&g_arpm.lock);
-	TAILQ_FOREACH(ent, &g_arpm.list, arp_link) {
-		if (ent->ip == arph->ar_sip) {
-			TAILQ_REMOVE(&g_arpm.list, ent, arp_link);
-			free(ent);
-			break;
+	for (ent = g_arpm.working_list; ent->arp_link; ent = ent->arp_link) {
+		old = ent->arp_link;
+		next = ent->arp_link->arp_link;
+		if (ent->arp_link->ip == arph->ar_sip) {
+			barrier();
+			ent->arp_link->flag = 0;
+			barrier();
+			if ((success(CASra(ent->arp_link, old, next)) < 0) {
+				return 0;
+			}
+			synchronize_rcu();
+			free(old);
 		}
 	}
-	pthread_mutex_unlock(&g_arpm.lock);
 
 	return 0;
 }
-/*----------------------------------------------------------------------------*/
+
+/** process arp packet */
 int
-ProcessARPPacket(mtcp_manager_t mtcp, uint32_t cur_ts,
-	const int ifidx, unsigned char* pkt_data, int len)
+process_ARP_packet(uint32_t cur_ts, const int ifidx, 
+	unsigned char* pkt_data, int len)
 {
 	struct arphdr* arph = (struct arphdr*)(pkt_data + sizeof(struct ethhdr));
 	int i, nif;
-	int to_me = FALSE;
+	int to_me = false;
 
 	/* process the arp messages destined to me */
 	for (i = 0; i < CONFIG.eths_num; i++) {
 		if (arph->ar_tip == CONFIG.eths[i].ip_addr) {
-			to_me = TRUE;
+			to_me = true;
 		}
 	}
 
 	if (!to_me)
-		return TRUE;
+		return 0;
 
 #if DBGMSG
 	DumpARPPacket(mtcp, arph);
@@ -289,28 +347,29 @@ ProcessARPPacket(mtcp_manager_t mtcp, uint32_t cur_ts,
 
 	switch (ntohs(arph->ar_op)) {
 	case arp_op_request:
-		nif = CONFIG.eths[ifidx].ifindex; // use the port index as argument
-		ProcessARPRequest(mtcp, arph, nif, cur_ts);
+		nif = config.eths[ifidx].ifindex; // use the port index as argument
+	    process_ARP_request(arph, nif, cur_ts);
 		break;
 
 	case arp_op_reply:
-		ProcessARPReply(mtcp, arph, cur_ts);
+		process_ARP_reply(arph, cur_ts);
 		break;
 
 	default:
 		break;
 	}
 
-	return TRUE;
+	return 0;
 }
+
 /*----------------------------------------------------------------------------*/
 /* ARPTimer: wakes up every milisecond and check the ARP timeout              */
 /*           timeout is set to 1 second                                       */
 /*----------------------------------------------------------------------------*/
 void
-ARPTimer(mtcp_manager_t mtcp, uint32_t cur_ts)
+ARP_timer(uint32_t cur_ts)
 {
-	struct arp_queue_entry* ent, * ent_tmp;
+	arp_queue_entry_t* ent, * ent_tmp;
 
 	/* if the arp requet is timed out, retransmit */
 	pthread_mutex_lock(&g_arpm.lock);
