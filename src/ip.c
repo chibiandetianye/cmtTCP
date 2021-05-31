@@ -2,8 +2,9 @@
 #include <netinet/ip.h>
 
 #include"ip.h"
+#include"cmtTCP.h"
 
-inline int
+int
 process_IPv4_packet(uint32_t cur_ts,
 	const int ifidx, unsigned char* pkt_data, int len)
 {
@@ -19,13 +20,13 @@ process_IPv4_packet(uint32_t cur_ts,
 	if (mtcp->iom->dev_ioctl != NULL)
 		rc = mtcp->iom->dev_ioctl(mtcp->ctx, ifidx, PKT_RX_IP_CSUM, iph);
 	if (rc == -1 && ip_fast_csum(iph, iph->ihl))
-		return ERROR;
+		return -1;
 
 #if !PROMISCUOUS_MODE
 	/* if not promiscuous mode, drop if the destination is not myself */
-	if (iph->daddr != CONFIG.eths[ifidx].ip_addr)
+	if (iph->daddr != config.eths[ifidx].ip_addr)
 		//DumpIPPacketToFile(stderr, iph, ip_len);
-		return TRUE;
+		return 0;
 #endif
 
 	// see if the version is correct
@@ -36,9 +37,9 @@ process_IPv4_packet(uint32_t cur_ts,
 
 	switch (iph->protocol) {
 	case IPPROTO_TCP:
-		return ProcessTCPPacket(mtcp, cur_ts, ifidx, iph, ip_len);
+		return process_TCP_packet(cur_ts, ifidx, iph, ip_len);
 	case IPPROTO_ICMP:
-		return ProcessICMPPacket(mtcp, iph, ip_len);
+		return process_ICMP_packet(iph, ip_len);
 	default:
 		/* currently drop other protocols */
 		return FALSE;
@@ -78,7 +79,7 @@ get_output_interface(uint32_t daddr, uint8_t* is_external)
 
 	return nif;
 }
-/*----------------------------------------------------------------------------*/
+
 uint8_t*
 IP_output_standalone(struct mtcp_manager* mtcp, uint8_t protocol,
 	uint16_t ip_id, uint32_t saddr, uint32_t daddr, uint16_t payloadlen)

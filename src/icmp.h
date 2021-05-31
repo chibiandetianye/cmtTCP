@@ -5,6 +5,7 @@
 
 #include"global.h"
 
+/** \brief structure of icmph packet format */
 typedef struct icmphdr {
 	uint8_t  icmp_type;
 	uint8_t  icmp_code;
@@ -29,13 +30,25 @@ typedef struct icmphdr {
 #define icmp_echo_set_id(icmph, id)      (icmph->un.echo.icmp_id = id)
 #define icmp_echo_set_seq(icmph, seq)    (icmph->un.echo.icmp_sequence = seq)
 
+/**	\brief request a icmp packet 
+	@param saddr source ip address
+	@param daddr destination ip address
+	@param icmp_id id of icmp packet
+	@param icmp_seq sequence of icmp packet
+	@param icmpd option data
+	@param len length of option data
+*/
 void
-RequestICMP(mtcp_manager_t mtcp, uint32_t saddr, uint32_t daddr,
+request_ICMP(uint32_t saddr, uint32_t daddr,
 	uint16_t icmp_id, uint16_t icmp_seq,
 	uint8_t* icmpd, uint16_t len);
 
+/**	\brief process the icmp packet 
+	@param iph ip packet
+	@len 
+*/
 int
-ProcessICMPPacket(mtcp_manager_t mtcp, struct iphdr* iph, int len);
+process_ICMP_packet(struct iphdr* iph, int len);
 
 /* ICMP types */
 #define ICMP_ECHOREPLY      0   /* Echo Reply               */
