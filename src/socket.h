@@ -5,12 +5,16 @@
 #include<sys/socket.h>
 
 #include"tcp.h"
+#include"queue.h"
 
 typedef struct cmt_socket_map {
+	struct cmt_socket_map* free_smap_link;
+	volatile int flag;
+
 	int id;
 	int socket_type;
+	
 	uint32_t opts;
-
 	struct sockaddr_in s_addr;
 
 	union {
@@ -21,8 +25,6 @@ typedef struct cmt_socket_map {
 	uint32_t epoll;
 	uint32_t events;
 	uint64_t ep_data;
-
-
 } cmt_socket_map_t;
 
 enum cmt_socket_opts {
@@ -30,13 +32,13 @@ enum cmt_socket_opts {
 	CMT_TCP_ADDR_BIND = 0x02,
 };
 
-cmt_socket_map_t* cmt_allocate_socket(int socktype, int need_lock);
+cmt_socket_map_t* cmt_allocate_socket(int socktype);
 void cmt_free_socket(int sockid, int need_lock);
 cmt_socket_map_t* cmt_get_socket(int sockid);
 
 typedef struct cmt_socket {
 	int id;
-	int socktype;
+	int sock_type;
 
 	uint32_t opts;
 	struct sockaddr_in s_addr;

@@ -24,6 +24,8 @@
 
 #define MAX_THREAD_NAME 512
 
+#define CMT_MAX_CONCURRENCY 1024
+
 /**	\brief structure of eth table */
 typedef struct eth_table {
 	volatile int8_t flag; //wthether mark initing completing
@@ -96,6 +98,13 @@ typedef struct working_list_context {
 
 typedef struct cmttcp_manager {
 	int nums_working_tcp_cores;
+	
+	struct cmt_socket_map_list {
+		cmt_socket_map_t dump;
+		cmt_socket_map_t* last;
+	} cmt_socket_map_list;
+
+	cmt_socket_map_t* sock_map;
 
 } cmttcp_manager_t;
 

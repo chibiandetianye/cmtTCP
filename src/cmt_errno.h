@@ -11,6 +11,7 @@ extern int cmt_errno;
 #define EINVAL -1
 #define ENONMEM 1
 #define EBUSY -2
+#define EBADF -3
 
 #endif //CMT_RING_CMT_ERRNO_H
 

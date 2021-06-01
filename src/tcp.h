@@ -4,6 +4,7 @@
 #include<stdint.h>
 
 #include"ring.h"
+#include"tcp_stream_hash.h"
 
 typedef enum cmt_tcp_state {
 	CMT_TCP_CLOSE = 0,
@@ -142,10 +143,13 @@ typedef struct cmt_tcp_recv {
 
 	cmt_ring_t* rcvbuf;
 
+	cmt_tcp_stream_t* h_next;
 
 } cmt_tcp_recv_t;
 
 typedef struct cmt_tcp_send {
+	hash_bucket_t* h_next;
+
 	/** ip-level information */
 	uint16_t ip_id; 
 
@@ -199,6 +203,8 @@ typedef struct cmt_tcp_send {
 
 typedef struct cmt_tcp_stream {
 	cmt_socket_t* socket;
+	hash_bucket_t* next; //next tcp stream in hash table
+
 
 	uint32_t id : 24,
 		stream_type : 8;
@@ -231,14 +237,14 @@ typedef struct cmt_tcp_stream {
 	uint32_t snd_nxt; /** send next */
 	uint32_t rcv_nxt; /** receive next */
 	
-	cmt_tcp_recv_t* rcvvar;
 	cmt_tcp_send_t* sndvar;
-
+	cmt_tcp_recv_t* rcvvar;
 } cmt_tcp_stream_t;
 
 typedef struct cmt_tcp_listener {
 	int sockid;
 
+	cmt_tcp_listener* ht_next;
 } cmt_tcp_listener_t;
 
 typedef struct cmt_tcp_manager {

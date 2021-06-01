@@ -323,7 +323,7 @@ tailq_insert_before(list_node_t* listelm, list_node_t* elm) {
 }
 
 always_inline void
-tailq_insert_head(list_head_t* head, list_node_t* elm) {
+tailq_insert_head(tailq_head_t* head, list_node_t* elm) {
 	if ((tailq_next(elm) = tailq_first(head)) != NULL)	
 		tailq_first(head)->tqe_prev = 
 		& tailq_next(elm);						
@@ -334,7 +334,7 @@ tailq_insert_head(list_head_t* head, list_node_t* elm) {
 }
 
 always_inline void
-tailq_insert_tail(list_head_t* head, list_node_t* elm) {
+tailq_insert_tail(tailq_head_t* head, list_node_t* elm) {
 	tailq_next(elm) = NULL;						
 	elm->tqe_prev = head->tqh_last;				
 	*head->tqh_last = elm;								
@@ -342,7 +342,7 @@ tailq_insert_tail(list_head_t* head, list_node_t* elm) {
 }
 
 always_inline void
-tailq_remove(list_head_t* head, list_node_t* elm) {
+tailq_remove(tailq_head_t* head, list_node_t* elm) {
 	if ((tailq_next(elm)) != NULL)			
 		tailq_next(elm)->tqe_prev = 
 		elm->tqe_prev;						
