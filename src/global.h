@@ -3,12 +3,16 @@
 //
 
 #include<assert.h>
+#include<sys/syscall.h>
+#include<stdint.h>
 
 #ifndef MEMORY_POOL_TEST_GLOBAL_H
 #define MEMORY_POOL_TEST_GLOBAL_H
 
 #define CACHELINE 64
 #define CMT_CACHELINE CACHELINE
+
+#define CMT_BITS_PER_BYTES 8
 
 #define _cache_aligned \
 __attribute__((aligned(CACHELINE)))
@@ -58,6 +62,10 @@ cmt_pause() {
 #ifndef true
 #define true 1
 #endif 
+
+typedef uint64_t cmt_tid
+
+#define cmt_gettid() syscall(__NR_gettid)
 
 #endif //MEMORY_POOL_TEST_GLOBAL_H
 

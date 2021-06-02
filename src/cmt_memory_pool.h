@@ -6,6 +6,8 @@
 #include<unistd.h>
 #include<stdint.h>
 
+#include"global.h"
+
 #define CMT_MAX_ALLOC_FROM_POOL (512)
 
 #define CMT_DEFAULT_POOL_SIZE (CMT_PAGESIZE)
@@ -85,6 +87,7 @@ typedef struct cmt_pool_control_block {
     -----------------------------------------------------------
  */
 typedef struct cmt_pool {
+    cmt_tid tid;  //pthread id
     cmt_pool_control_block_t    cb; // control block of memory chunk
     cmt_pool_bin_t              smallbins[TOTAL_BINS]; //management of small chunk
 } cmt_pool_t;

@@ -55,6 +55,7 @@ cmt_create_pool(size_t size) {
         return NULL;
     }
 
+    pool->tid = cmt_gettid();
     ctb = pool->cb;
     ctb.size = size;
     ctb.remained = size;

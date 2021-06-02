@@ -7,6 +7,7 @@
 #include"cmt_memory_pool.h"
 #include"ring.h"
 #include"global.h"
+#include"socket.h"
 
 #define DEFAULT_WORKING_LIST 4
 
@@ -25,6 +26,8 @@
 #define MAX_THREAD_NAME 512
 
 #define CMT_MAX_CONCURRENCY 1024
+
+#define CMT_SOCKFD_NR (1024 * 1024)
 
 /**	\brief structure of eth table */
 typedef struct eth_table {
@@ -98,14 +101,14 @@ typedef struct working_list_context {
 
 typedef struct cmttcp_manager {
 	int nums_working_tcp_cores;
-	
+
 	struct cmt_socket_map_list {
 		cmt_socket_map_t dump;
 		cmt_socket_map_t* last;
 	} cmt_socket_map_list;
 
 	cmt_socket_map_t* sock_map;
-
+	cmt_socket_table_t* fdtable;
 } cmttcp_manager_t;
 
 typedef struct cmttcp_working_list_context {

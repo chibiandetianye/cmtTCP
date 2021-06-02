@@ -6,6 +6,7 @@
 
 #include"tcp.h"
 #include"queue.h"
+#include"global.h"
 
 typedef struct cmt_socket_map {
 	struct cmt_socket_map* free_smap_link;
