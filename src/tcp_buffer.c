@@ -2,6 +2,8 @@
 
 #include "tcp_buffer.h"
 #include"cmt_memory_pool.h"
+#include"tcp.h"
+#include"atomic.h"
 
 #define MAX(a, b) ((a)>(b)?(a):(b))
 #define MIN(a, b) ((a)<(b)?(a):(b))
@@ -370,7 +372,7 @@ merge_fragments(cmt_fragment_t* a, cmt_fragment_t* b) {
 
 int 
 recv_put(cmt_recv_manager_t* rbm, cmt_recv_buffer_t* buff,
-	void* data, uint32_t len, uint32_t cur_seq) {
+	void* data, char* stream, uint32_t len, uint32_t cur_seq) {
 	cmt_data_ptr* data_ptr;
 	cmt_fragment_t* frag;
 	int putx, end_off;
@@ -463,7 +465,7 @@ recv_put(cmt_recv_manager_t* rbm, cmt_recv_buffer_t* buff,
 	return len;
 }
 
-size_t RBRemove(cmt_recv_manager_t* rbm, cmt_recv_buffer* buff, size_t len, int option)
+size_t recv_remove(cmt_recv_manager_t* rbm, cmt_recv_buffer* buff, size_t len, int option)
 {
 	/* this function should be called only in application thread */
 
@@ -503,91 +505,79 @@ size_t RBRemove(cmt_recv_manager_t* rbm, cmt_recv_buffer* buff, size_t len, int 
 
 
 
-nty_stream_queue_int* CreateInternalStreamQueue(int size) {
-	nty_stream_queue_int* sq;
+cmt_stream_manager_t* 
+create_stream_manager() {
+	cmt_pool_t* pool = get_cmt_pool();
 
-	sq = (nty_stream_queue_int*)calloc(1, sizeof(nty_stream_queue_int));
-	if (!sq) {
+	cmt_stream_manager_t* sm;
+
+	sm = (cmt_stream_manager_t*)cmt_palloc(pool, sizeof(cmt_stream_manager_t));
+	if (unlikely(!sm)) {
+		printf("failed to alloc stream manager\n");
 		return NULL;
 	}
 
-	sq->array = (struct _nty_tcp_stream**)calloc(size, sizeof(struct _nty_tcp_stream*));
-	if (!sq->array) {
-		free(sq);
+	sm->stream_pool = cmt_object_pool_create(sizeof(cmt_tcp_stream_t), 0);
+	if (unlikely(sm == NULL)) {
+		printf("faield to alloc stream object pool\n");
 		return NULL;
 	}
-
-	sq->size = size;
-	sq->first = sq->last = 0;
-	sq->count = 0;
+	
+	sm->stream_size = sizeof(cmt_tcp_strema_t);
+	sm->cnum = 0;
 
 	return sq;
 }
 
-void DestroyInternalStreamQueue(nty_stream_queue_int* sq) {
-	if (!sq)
+void 
+stream_manager_destroy(cmt_stream_manager_t* sm) {
+	if (!sm)
 		return;
 
-	if (sq->array) {
-		free(sq->array);
-		sq->array = NULL;
-	}
-
-	free(sq);
+	cmt_pool_t* pool = get_cmt_pool();
+	cmt_object_pool_destroy(sm->stream_pool);
+	cmt_pfree(pool, sm, sizeof(cmt_stream_manager_t);
 }
 
-int StreamInternalEnqueue(nty_stream_queue_int* sq, struct _nty_tcp_stream* stream) {
-	if (sq->count >= sq->size) {
-		/* queue is full */
-		printf("[WARNING] Queue overflow. Set larger queue size! "
-			"count: %d, size: %d\n", sq->count, sq->size);
-		return -1;
-	}
+int free_stream(cmt_stream_manager_t* sm, cmt_tcp_stream_t* stream)
+{
+	cmt_oject_pool_t* stream_pool = sm->stream_pool;
 
-	sq->array[sq->last++] = stream;
-	sq->count++;
-	if (sq->last >= sq->size) {
-		sq->last = 0;
-	}
-	assert(sq->count <= sq->size);
+	cmt_object_free(stream_pool, stream);
+
+	sm->cum--;
 
 	return 0;
 }
 
-struct _nty_tcp_stream* StreamInternalDequeue(nty_stream_queue_int* sq) {
-	struct _nty_tcp_stream* stream = NULL;
-
-	if (sq->count <= 0) {
-		return NULL;
+cmt_tcp_stream_t* 
+get_stream(cmt_stream_manager_t* sm) {
+	cmt_object_pool_t* stream_pool = sm->stream_pool;
+	cmt_tcp_stream_t* stream = cmt_object_get(stream_pool);
+	if (unlikely(stream == NULL)) {
+		printf("failed to get stream from object pool\n");
+		return stream;
 	}
 
-	stream = sq->array[sq->first++];
-	assert(stream != NULL);
-	if (sq->first >= sq->size) {
-		sq->first = 0;
-	}
-	sq->count--;
-	assert(sq->count >= 0);
-
+	sm->cnum++;
 	return stream;
 }
 
-int StreamQueueIsEmpty(nty_stream_queue* sq)
-{
-	return (sq->_head == sq->_tail);
-}
-
-
-nty_stream_queue* CreateStreamQueue(int capacity) {
+cmt_stream_queue_t* create_stream_queue(int capacity) {
 	nty_stream_queue* sq;
+	cmt_pool_t* pool = get_cmt_pool();
 
-	sq = (nty_stream_queue*)calloc(1, sizeof(nty_stream_queue));
-	if (!sq)
+	sq = (cmt_stream_queue_t*)cmt_palloc(pool, sizeof(cmt_stream_queue_t));
+	if (unlikely(!sq)) {
+		printf("failed to create stream queue from pool\n");
 		return NULL;
+	}		
 
-	sq->_q = (struct _nty_tcp_stream**)calloc(capacity + 1, sizeof(struct _nty_tcp_stream*));
-	if (!sq->_q) {
-		free(sq);
+	sq->_q = (struct cmt_tcp_stream**)cmt_palloc(pool, 
+		(capacity+1) * sizeof(struct cmt_tcp_stream*));
+	if (unlikely(!sq->_q)) {
+		printf("failed to create internal queue from pool\n");
+		cmt_pfree(pool, sq, sizeof(cmt_stream_queue_t));
 		return NULL;
 	}
 
@@ -597,27 +587,30 @@ nty_stream_queue* CreateStreamQueue(int capacity) {
 	return sq;
 }
 
-void DestroyStreamQueue(nty_stream_queue* sq)
-{
+void 
+destroy_stream_queue(cmt_stream_queue_t* sq) {
 	if (!sq)
 		return;
 
+	cmt_pool_t* pool = get_cmt_pool();
+
 	if (sq->_q) {
-		free((void*)sq->_q);
+		cmt_pfree(pool, (void*)sq->_q), sq->_capacity + 1);
 		sq->_q = NULL;
 	}
 
-	free(sq);
+	cmt_pfree(pool, sq, sizeof(cmt_stream_queue_t);
 }
 
-int StreamEnqueue(nty_stream_queue* sq, struct _nty_tcp_stream* stream) {
+int 
+stream_enqueue(cmt_stream_queue_t* sq, cmt_tcp_stream_t* stream) {
 	index_type h = sq->_head;
 	index_type t = sq->_tail;
 	index_type nt = NextIndex(sq, t);
 
 	if (nt != h) {
 		sq->_q[t] = stream;
-		MemoryBarrier(sq->_q[t], sq->_tail);
+		barrier();
 		sq->_tail = nt;
 		return 0;
 	}
@@ -626,14 +619,15 @@ int StreamEnqueue(nty_stream_queue* sq, struct _nty_tcp_stream* stream) {
 	return -1;
 }
 
-struct _nty_tcp_stream* StreamDequeue(nty_stream_queue* sq)
+cmt_tcp_stream_t* 
+stream_dequeue(cmt_stream_queue_t* sq)
 {
 	index_type h = sq->_head;
 	index_type t = sq->_tail;
 
 	if (h != t) {
 		struct _nty_tcp_stream* stream = sq->_q[h];
-		MemoryBarrier(sq->_q[h], sq->_head);
+		barrier();
 		sq->_head = NextIndex(sq, h);
 		assert(stream);
 		return stream;
@@ -641,5 +635,3 @@ struct _nty_tcp_stream* StreamDequeue(nty_stream_queue* sq)
 
 	return NULL;
 }
-
-

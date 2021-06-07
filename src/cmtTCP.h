@@ -10,8 +10,13 @@
 #include"tcp.h"
 #include"tcp_stream_hash.h"
 #include"socket.h"
+#include"addr_pool.h"
+#include"tcp_buffer.h"
+#include"io_module.h"
 
 #define DEFAULT_WORKING_LIST 4
+
+#define MAXCPUS 16
 
 #ifndef CORE_NUMS
 #define CORE_NUMS 8
@@ -101,18 +106,14 @@ typedef struct working_list_context {
 	} pv_flag;
 } working_list_context;
 
-typedef struct cmttcp_send_manager {
-	cmt_thread_context_t* ctx;
-	cmt_ring_t *
-} cmttcp_send_manager_t;
-
-typedef struct cmttcp_recv_manager {
-	cmt_thread_context_t* ctx;
-} cmttcp_recv_manager_t;
-
-typedef object_pool flow_pool_t;
-typedef object_pool rcv_pool_t;
-typedef object_pool snd_pool_t;
+//typedef struct cmttcp_send_manager {
+//	cmt_thread_context_t* ctx;
+//	cmt_ring_t *
+//} cmttcp_send_manager_t;
+//
+//typedef struct cmttcp_recv_manager {
+//	cmt_thread_context_t* ctx;
+//} cmttcp_recv_manager_t;
 
 extern struct cmttcp_manager;
 
@@ -121,10 +122,10 @@ typedef struct cmttcp_manager_per_cpu {
 	struct cmttcp_manager* manager;
 
 	cmt_pool_t* pool;
-	flow_pool_t* flow_pool; //object pool for stream
-	rcv_pool_t* rcv_pool; //object pool for tcp stream recv object
-	snd_pool_t* snd_pool; //object pool for tcp stream snd object
-	
+	cmt_sb_manager_t* send_manager;
+	cmt_recv_manager_t* recv_manager;
+	cmt_stream_manager_t* stream_manager;
+	cmt_sender_t* sender;
 
 	cmttcp_send_manager_t* send_m _cache_aligned;
 	cmttcp_recv_manager_t* recv_m _cache_aligned;
@@ -135,10 +136,33 @@ typedef struct cmttcp_manager_per_cpu {
 
 	cmt_socket_map_t* smap;
 
+	addr_pool_t* addr_pool;
+
+	uint64_t flow_count;
+
+	struct {
+		uint8_t count;
+		uint32_t ready;
+	} poll_flag _cache_aligned;
+
+	struct {
+		pthread_cond_t cond;
+		pthread_mutex_t lock;
+		uint64_t prev_end;
+		unit64_t start_timestamp;
+	} pv_flag;
+
 } cmttcp_manager_per_cpu_t;
+
+extern struct cmttcp_working_list_context;
 
 typedef struct cmttcp_manager {
 	int nums_working_tcp_cores;
+	int nums_working_cores;
+	cmttcp_manager_per_cpu_t* tcp_mpercpu[MAXCPUS];
+	struct cmttcp_working_list_context* working_thread[DEFAULT_WORKING_LIST];
+
+	struct io_module_func* io_module;
 
 	struct cmt_socket_map_list {
 		cmt_socket_map_t dump;

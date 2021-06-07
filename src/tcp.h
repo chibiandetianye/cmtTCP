@@ -3,8 +3,9 @@
 
 #include<stdint.h>
 
-#include"ring.h"
 #include"tcp_stream_hash.h"
+#include"tcp_buffer.h"
+#include"queue.h"
 
 typedef enum cmt_tcp_state {
 	CMT_TCP_CLOSE = 0,
@@ -141,7 +142,7 @@ typedef struct cmt_tcp_recv {
 	uint32_t rttvar; /** smoothed mdev_max */
 	uint32_t rtt_seq; /** sequence number to used */
 
-	cmt_ring_t* rcvbuf;
+	cmt_recv_buffer_t* rcvbuf;
 
 	cmt_tcp_stream_t* h_next;
 
@@ -149,6 +150,11 @@ typedef struct cmt_tcp_recv {
 
 typedef struct cmt_tcp_send {
 	hash_bucket_t* h_next;
+	list_node_t* control_list;
+	list_node_t* send_list;
+	list_node_t* ack_list;
+	list_node_t* timer_list;
+	list_node_t* timeout_list;
 
 	/** ip-level information */
 	uint16_t ip_id; 
@@ -186,10 +192,10 @@ typedef struct cmt_tcp_send {
 	
 	uint8_t on_control_list; 
 	uint8_t on_send_list;
-	unit8_t on_ack_list;
+	uint8_t on_ack_list;
 	uint8_t on_sendq;
-	unit8_t on_ackq;
-	unit8_t on_closeq;
+	uint8_t on_ackq;
+	uint8_t on_closeq;
 	uint8_t on_resetq;
 
 	uint8_t on_closeq_int : 1,
@@ -197,7 +203,7 @@ typedef struct cmt_tcp_send {
 		is_fin_sent : 1,
 		is_fin_ackd : 1;
 
-	cmt_ring_t* sndbuf;
+	cmt_send_buffer_t* sndbuf;
 
 } cmt_tcp_send_t;
 
@@ -244,12 +250,24 @@ typedef struct cmt_tcp_stream {
 typedef struct cmt_tcp_listener {
 	int sockid;
 
+	cmt_stream_queue_t* acceptq;
+
+	pthread_mutex_t accept_lock;
+	pthread_cond_t accept_cond;
+
 	cmt_tcp_listener* ht_next;
 } cmt_tcp_listener_t;
 
-typedef struct cmt_tcp_manager {
+typedef struct cmt_sender {
+	tailq_head_t* control_list;
+	tailq_head_t* send_list;
+	tailq_head_t* ack_list;
 
-} cmt_tcp_manager_t;
+	uint32_t control_list_cnt;
+	uint32_t send_list_cnt;
+	uint32_t ack_list_cnt;
+} cmt_sender_t;
+
 
 
 #endif /** _TCP_INCLUDE_H_ */

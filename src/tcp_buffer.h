@@ -73,25 +73,22 @@ typedef struct cmt_recv_manager {
 	cmt_object_pool_t* dataptr_pool;
 } cmt_recv_manager_t;
 
-typedef struct _nty_stream_queue
+typedef struct cmt_stream_queue
 {
 	index_type _capacity;
 	volatile index_type _head;
 	volatile index_type _tail;
 
-	struct _nty_tcp_stream* volatile* _q;
-} nty_stream_queue;
+	struct cmt_tcp_stream* volatile* _q;
+} cmt_stream_queue_t;
 
-typedef struct _nty_stream_queue_int
+typedef struct cmt_stream_manager
 {
-	struct _nty_tcp_stream** array;
-	int size;
-
-	int first;
-	int last;
-	int count;
-
-} nty_stream_queue_int;
+	size_t stream_size;
+	uint32_t cnum;
+	
+	cmt_object_pool_t* stream_pool;
+} cmt_stream_manager_t;
 
 cmt_sb_manager_t* cmt_sbmanager_create(size_t chunk_size, uint32_t cnum);
 
@@ -105,5 +102,28 @@ size_t SBPut(cmt_send_buffer_t* buf, const void* data, size_t len);
 
 size_t SBRemove(cmt_send_buffer* buf, size_t len);
 
-cmt_recv_manager_t* RBManagerCreate(size_t chunk_size, uint32_t cnum)
+cmt_recv_manager_t* recv_manager_create(size_t chunk_size, uint32_t cnum);
+
+void recv_manager_destroy(cmt_recv_managet_t* cmt);
+
+int recv_put(cmt_recv_manager_t* rbm, cmt_recv_buffer_t* buff,
+	void* data, char* stream, uint32_t len, uint32_t cur_seq);
+
+size_t recv_remove(cmt_recv_manager_t* rbm, cmt_recv_buffer* buff, size_t len, int option);
+
+cmt_stream_manager_t* create_stream_manager();
+
+void stream_manager_destroy(cmt_stream_manager_t* sm);
+
+always_inline int
+stream_queue_is_empty(cmt_stream_queue_t* sq)
+{
+	return (sq->_head == sq->_tail);
+}
+
+int free_stream(cmt_stream_manager_t* sm, cmt_tcp_stream_t* stream);
+
+cmt_tcp_stream_t* get_stream(cmt_stream_manager_t* sm);
+
+
 #endif /** _TCP_BUFFER_INCLUDE_H_ */
