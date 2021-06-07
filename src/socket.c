@@ -122,15 +122,28 @@ cmt_socket_init_fdtable() {
 int
 cmt_socket_find_id(unsigned char* fds, int start, size_t max_fds) {
 	size_t i = 0;
-	for (i = start; i < max_fds; ++i) {
+	size_t len = (max_fds - start) * (sizeof(char)) / sizeof(uint64_t);
+	size_t remained = (max_fds - start) * (sizeof(char)) - len * sizeof(uint64_t);
+	size_t startfds = (uint64_t*)(fds + start);
+	for (i = 0; i < len; ++i) {
+		uint64_t x = ~startfds[i];
+		if (fds[i] != 0) {
+			return i * sizeof(uint64_t) * CMT_BITS_PER_BYTES +
+				start * CMT_BITS_PER_BYTES + log2_first_set(x);
+		}
+	}
+	i = i * sizeof(uint64_t) + start;
+
+	if (i == max_fds) {
+		return -1;
+	}
+	for (; i < max_fds; ++i) {
 		if (fds[i] != 0xFF) {
 			break;
 		}
 	}
-	if (i == max_fds) {
-		return -1;
-	}
 
+	if (i == max_fds) return -1;
 	int j = 0;
 	char bytes = fds[i];
 	while (bytes % 2) {

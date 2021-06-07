@@ -9,6 +9,14 @@
 #ifndef MEMORY_POOL_TEST_GLOBAL_H
 #define MEMORY_POOL_TEST_GLOBAL_H
 
+#define WORD_BYTES 64
+
+#if WORD_BYTES == 64
+#define count_leading_zeros(x) __builtin_clzll (x)
+#define count_trailing_zeros(x) __builtin_ctzll (x)
+#endif
+
+
 #define CACHELINE 64
 #define CMT_CACHELINE CACHELINE
 
@@ -24,6 +32,15 @@ static __attribute__((always_inline))
 
 #define _packed	\
 __attribute__((packed))
+
+#ifndef false
+#define false 0
+#endif
+
+#ifndef true
+#define true 1
+#endif 
+
 
 # define likely(x)  __builtin_expect(!!(x), 1)
 # define unlikely(x)    __builtin_expect(!!(x), 0)
@@ -55,17 +72,18 @@ cmt_pause() {
     ;
 }
 
-#ifndef false
-#define false 0
-#endif
-
-#ifndef true
-#define true 1
-#endif 
+always_inline uint64_t
+log2_first_set(uint64_t x) {
+    uint64_t result;
+    result = count_trailing_zeros(x);
+    return result;
+}
 
 typedef uint64_t cmt_tid
 
 #define cmt_gettid() syscall(__NR_gettid)
+
+
 
 #endif //MEMORY_POOL_TEST_GLOBAL_H
 

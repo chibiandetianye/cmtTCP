@@ -49,7 +49,7 @@ cmt_ring_create(const char *name, unsigned int count,
 }
 
 void
-cmt_ring_destory(cmt_ring_t* r) {
+cmt_ring_destroy(cmt_ring_t* r) {
     cmt_pool_t* pool_ = get_cmt_pool();
     unsigned int size = sizeof(cmt_ring_t) + r->cons.size * sizeof(void*);
     cmt_pmemfree(p_, r, __alignof__(cmt_ring_t), size);

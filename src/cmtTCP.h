@@ -7,6 +7,8 @@
 #include"cmt_memory_pool.h"
 #include"ring.h"
 #include"global.h"
+#include"tcp.h"
+#include"tcp_stream_hash.h"
 #include"socket.h"
 
 #define DEFAULT_WORKING_LIST 4
@@ -99,6 +101,42 @@ typedef struct working_list_context {
 	} pv_flag;
 } working_list_context;
 
+typedef struct cmttcp_send_manager {
+	cmt_thread_context_t* ctx;
+	cmt_ring_t *
+} cmttcp_send_manager_t;
+
+typedef struct cmttcp_recv_manager {
+	cmt_thread_context_t* ctx;
+} cmttcp_recv_manager_t;
+
+typedef object_pool flow_pool_t;
+typedef object_pool rcv_pool_t;
+typedef object_pool snd_pool_t;
+
+extern struct cmttcp_manager;
+
+typedef struct cmttcp_manager_per_cpu {
+	cmt_thread_context* ctx;
+	struct cmttcp_manager* manager;
+
+	cmt_pool_t* pool;
+	flow_pool_t* flow_pool; //object pool for stream
+	rcv_pool_t* rcv_pool; //object pool for tcp stream recv object
+	snd_pool_t* snd_pool; //object pool for tcp stream snd object
+	
+
+	cmttcp_send_manager_t* send_m _cache_aligned;
+	cmttcp_recv_manager_t* recv_m _cache_aligned;
+
+	cmt_tcp_hashtable_t* tcp_flow_table;
+
+	cmt_sock_table_t* fd_table;
+
+	cmt_socket_map_t* smap;
+
+} cmttcp_manager_per_cpu_t;
+
 typedef struct cmttcp_manager {
 	int nums_working_tcp_cores;
 
@@ -133,6 +171,8 @@ typedef struct cmttcp_working_list_context {
 		unit64_t start_timestamp;
 	} pv_flag;
 } cmttcp_working_list_context_t;
+
+
 
 cmttcp_manager_t* get_cmttcp_manager();
 

@@ -53,7 +53,7 @@ cmt_object_pool_create(size_t elm, size_t align) {
 }
 
 void
-cmt_object_pool_destroy(object_pool_t* p) {
+cmt_object_pool_destroy(cmt_object_pool_t* p) {
 	cmt_object_node_t* node = p->obj_queue£¬ tmp;
 	cmt_pool_t* pool = get_cmt_pool();
 	size_t align = p->obj_info.align;
@@ -68,7 +68,7 @@ cmt_object_pool_destroy(object_pool_t* p) {
 }
 
 always_inline void 
-resize(object_pool_t* p) {
+resize(cmt_object_pool_t* p) {
 	size_t update_size;
 	cmt_obj_info_t* info = p->obj_info;
 	cmt_obj_node_t* head = p->obj_queue, *new_node;
@@ -97,7 +97,7 @@ resize(object_pool_t* p) {
 }
 
 void*
-cmt_object_get(object_pool_t* pool) {
+cmt_object_get(cmt_object_pool_t* pool) {
 	resize(pool);
 	if (pool->obj_info.free_count <= 0) {
 		printf("%s [%d] failed\n", __FUNCTION__, __LINE__);
@@ -110,7 +110,7 @@ cmt_object_get(object_pool_t* pool) {
 }
 
 void
-cmt_object_free(object_pool_t* pool, void* p) {
+cmt_object_free(cmt_object_pool_t* pool, void* p) {
 	cmt_object_node_t* node = (cmt_object_node_t*)p;
 	node->next = pool->obj_queue;
 	pool->obj_queue = node;
