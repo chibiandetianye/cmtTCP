@@ -20,7 +20,7 @@ typedef struct icmphdr {
 			uint16_t nhop_mtu;
 		} dest;                     // DEST_UNREACH
 	} un;
-}_packed icmphdr;
+}_packed;
 
 /* getters and setters for ICMP fields */
 #define icmp_echo_get_id(icmph)          (icmph->un.echo.icmp_id)

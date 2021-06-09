@@ -1,9 +1,14 @@
 #ifndef _CPU_INCLUDE_H_
 #define _CPU_INCLUDE_H_
 
-inline int get_num_CPUs();
+#include<pthread.h>
 
-inline int which_core_ID(int thread_no);
+int get_nums_cpu()
+
+pid_t gettid();
+
+int
+cmt_core_affinitize(int cpu);
 
 
 #endif /** _CPU_INCLUDE_H_ */

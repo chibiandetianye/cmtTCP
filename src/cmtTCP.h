@@ -127,6 +127,8 @@ typedef struct cmttcp_manager_per_cpu {
 	cmt_stream_manager_t* stream_manager;
 	cmt_sender_t* sender;
 
+	cmt_tcp_listener_t* listeners;
+
 	cmttcp_send_manager_t* send_m _cache_aligned;
 	cmttcp_recv_manager_t* recv_m _cache_aligned;
 

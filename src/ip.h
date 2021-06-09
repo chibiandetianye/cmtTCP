@@ -3,6 +3,22 @@
 
 #include<stdint.h>
 
+#include"global.h"
+
+struct iphdr {
+	unsigned char ihl : 4,
+		version : 4;
+	unsigned char tos;
+	unsigned short tot_len;
+	unsigned short id;
+	unsigned short flag_off;
+	unsigned char ttl;
+	unsigned char protocol;
+	unsigned short check;
+	unsigned int saddr;
+	unsigned int daddr;
+} _packed;
+
 /**	\brief process a ipv4 packet 
 	@param cur_ts current timestamps
 	@param ifidx no. nic interface

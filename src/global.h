@@ -81,7 +81,6 @@ log2_first_set(uint64_t x) {
 
 typedef uint64_t cmt_tid
 
-#define cmt_gettid() syscall(__NR_gettid)
 
 
 
