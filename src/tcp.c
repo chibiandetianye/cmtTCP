@@ -4,7 +4,11 @@
 #include"tcp.h"
 #include"cmtTCP.h"
 #include"global.h"
+#include"tcp_buffer.h"
 #include"ip.h"
+
+cmt_tcp_stream_t* create_tcp_stream(cmttcp_manager_per_cpu_t* m, cmt_socket_map_t* socket, const struct iphdr* iph,
+	const struct tcphdr* tcph, uint32_t seq, uint16_t window);
 
 always_inline uint16_t 
 cmt_calculate_option(uint8_t flags) {
@@ -370,30 +374,101 @@ always_inline cmt_tcp_stream_t*
 cmt_tcp_passive_open(cmttcp_manager_per_cpu_t* tcp, uint32_t cur_ts, const struct iphdr* iph,
 	const struct tcphdr* tcph, uint32_t seq, uint16_t window) {
 
-	nty_tcp_stream* cur_stream = CreateTcpStream(tcp, NULL, NTY_TCP_SOCK_STREAM,
+	cmt_tcp_stream_t* cur_stream = create_tcp_stream(tcp, NULL, NTY_TCP_SOCK_STREAM,
 		iph->daddr, tcph->dest, iph->saddr, tcph->source);
 	if (cur_stream == NULL) {
-		nty_trace_tcp("INFO: Could not allocate tcp_stream!\n");
+		printf("%d failed to allocate tcp_stream!\n", __LINE__);
 		return NULL;
 	}
 
-	cur_stream->rcv->irs = seq;
-	cur_stream->snd->peer_wnd = window;
+	cur_stream->rcvvar->irs = seq;
+	cur_stream->sndvar->peer_wnd = window;
 	cur_stream->rcv_nxt = cur_stream->rcv->irs;
-	cur_stream->snd->cwnd = 1;
+	cur_stream->sndvar->cwnd = 1;
 
 #if 1
-	cur_stream->rcv->recvbuf = RBInit(tcp->rbm_rcv, cur_stream->rcv->irs + 1);
-	if (!cur_stream->rcv->recvbuf) {
+	cur_stream->rcv->recvbuf = recv_get(tcp->recvb_manager, cur_stream->rcvvar->irs + 1);
+	if (unlikely(!cur_stream->rcvvar->recvbuf)) {
 		cur_stream->state = NTY_TCP_CLOSED;
 		cur_stream->close_reason = TCP_NO_MEM;
 
 	}
 #endif
 
-	nty_tcp_parse_options(cur_stream, cur_ts, (uint8_t*)tcph + TCP_HEADER_LEN,
+	cmt_tcp_parse_options(cur_stream, cur_ts, (uint8_t*)tcph + TCP_HEADER_LEN,
 		(tcph->doff << 2) - TCP_HEADER_LEN);
-	nty_trace_tcp("nty_tcp_passive_open : %d, %d\n", cur_stream->rcv_nxt, cur_stream->snd->mss);
-
+	
 	return cur_stream;
 }
+
+
+
+cmt_tcp_stream_t* 
+create_tcp_stream(cmttcp_manager_per_cpu_t* m, cmt_socket_map_t* socket, const struct iphdr* iph,
+	const struct tcphdr* tcph, uint32_t seq, uint16_t window) {
+	cmt_tcp_stream_t* stream = NULL;
+	
+	stream = get_stream(m->stream_manager);
+	if (unlikely(stream == NULL)) {
+		printf("%d failed to create stream from pool\n", __LINE__);
+		return NULL;
+	}
+	
+	stream->sndvar = snd_get(m->send_manager);
+	if (unlikely(stream->sndvar == NULL)) {
+		free_stream(m->stream_manager, stream);
+		printf("%d faield to create snd from pool\n", __LINE__);
+		return NULL;
+	}
+
+	stream->recvvar = recv_get(m->recv_manager);
+	if (unlikely(stream->recvvar == NULL)) {
+		free_snd(m->send_manager, stream->sndvar);
+		free_stream(m->stream_manager, stream);
+		printf("%d failed to create recv from pool\n", __LINE__);
+		return NULL;
+	}
+
+	stream->saddr = saddr;
+	stream->sport = sport;
+	stream->daddr = daddr;
+	stream->dport = dport;
+
+	int ret = stream_ht_insert(m->tcp_flow_table, stream);
+
+	stream->stream_type = type;
+	stream->state = NTY_TCP_LISTEN;
+	stream->on_rto_idx = -1;
+
+	stream->snd->ip_id = 0;
+	stream->snd->mss = TCP_DEFAULT_MSS;
+	stream->snd->wscale_mine = TCP_DEFAULT_WSCALE;
+	stream->snd->wscale_peer = 0;
+	stream->snd->nif_out = 0;
+
+	stream->snd->iss = rand_r(&next_seed) % TCP_MAX_SEQ;
+	stream->rcv->irs = 0;
+
+	stream->snd_nxt = stream->snd->iss;
+	stream->snd->snd_una = stream->snd->iss;
+	stream->snd->snd_wnd = CMT_SEND_BUFFER_SIZE;
+
+	stream->rcv_nxt = 0;
+	stream->rcv->rcv_wnd = TCP_INITIAL_WINDOW;
+	stream->rcv->snd_wl1 = stream->rcv->irs - 1;
+
+	stream->snd->rto = TCP_INITIAL_RTO;
+
+	uint8_t* sa = (uint8_t*)&stream->saddr;
+	uint8_t* da = (uint8_t*)&stream->daddr;
+
+	printf("CREATED NEW TCP STREAM %d: "
+		"%u.%u.%u.%u(%d) -> %u.%u.%u.%u(%d) (ISS: %u)\n", stream->id,
+		sa[0], sa[1], sa[2], sa[3], ntohs(stream->sport),
+		da[0], da[1], da[2], da[3], ntohs(stream->dport),
+		stream->snd->iss);
+
+	return stream;
+
+}
+

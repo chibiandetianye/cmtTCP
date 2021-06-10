@@ -2,6 +2,7 @@
 #define _TCP_BUFFER_INCLUDE_H_
 
 #include"object_pool.h"
+#include"tcp.h"
 
 typedef struct cmt_sb_manager
 {
@@ -65,13 +66,13 @@ typedef struct cmt_recv_buffer {
 	cmt_fragment_t* fctx;
 } cmt_recv_buffer_t;
 
-typedef struct cmt_recv_manager {
+typedef struct cmt_recvb_manager {
 	size_t chunk_size;
 	uint32_t cnum;
 
-	cmt_object_pool_t* recv_pool;
+	cmt_object_pool_t* recvb_pool;
 	cmt_object_pool_t* dataptr_pool;
-} cmt_recv_manager_t;
+} cmt_recvb_manager_t;
 
 typedef struct cmt_stream_queue
 {
@@ -90,26 +91,44 @@ typedef struct cmt_stream_manager
 	cmt_object_pool_t* stream_pool;
 } cmt_stream_manager_t;
 
+typedef struct cmt_snd_manager {
+	size_t snd_size;
+	uint32_t cnum;
+
+	cmt_object_pool_t* stream_pool;
+} cmt_snd_manager_t;
+
+typedef struct cmt_recv_manager {
+	size_t recv_size;
+	uint32_t cnum;
+
+	cmt_object_pool_t* recv_pool;
+} cmt_recv_manager_t;
+
 cmt_sb_manager_t* cmt_sbmanager_create(size_t chunk_size, uint32_t cnum);
 
 void cmt_sbmanager_destroy(cmt_sb_manager_t* sbm);
 
-cmt_send_buffer_t* SBInit(cmt_sb_manager_t* sbm, uint32_t init_seq);
+cmt_send_buffer_t* sb_get(cmt_sb_manager_t* sbm, uint32_t init_seq);
 
-void SBFree(cmt_sb_manager_t* sbm, cmt_send_buffer_t* buf);
+void free_sb(cmt_sb_manager_t* sbm, cmt_send_buffer_t* buf);
 
-size_t SBPut(cmt_send_buffer_t* buf, const void* data, size_t len);
+size_t sb_put(cmt_send_buffer_t* buf, const void* data, size_t len);
 
-size_t SBRemove(cmt_send_buffer* buf, size_t len);
+size_t sb_remove(cmt_send_buffer* buf, size_t len);
 
-cmt_recv_manager_t* recv_manager_create(size_t chunk_size, uint32_t cnum);
+cmt_recvb_manager_t* recv_manager_create(size_t chunk_size, uint32_t cnum);
 
-void recv_manager_destroy(cmt_recv_managet_t* cmt);
+void recvb_manager_destroy(cmt_recvb_managet_t* cmt);
+
+cmt_recv_buffer_t* recv_get(cmt_recvb_manager_t* cmt);
+
+void free_recvb(cmt_recvb_manager_t* cmt);
 
 int recv_put(cmt_recv_manager_t* rbm, cmt_recv_buffer_t* buff,
 	void* data, char* stream, uint32_t len, uint32_t cur_seq);
 
-size_t recv_remove(cmt_recv_manager_t* rbm, cmt_recv_buffer* buff, size_t len, int option);
+size_t recv_remove(cmt_recvb_manager_t* rbm, cmt_recv_buffer* buff, size_t len, int option);
 
 cmt_stream_manager_t* create_stream_manager();
 
@@ -125,5 +144,20 @@ int free_stream(cmt_stream_manager_t* sm, cmt_tcp_stream_t* stream);
 
 cmt_tcp_stream_t* get_stream(cmt_stream_manager_t* sm);
 
+cmt_snd_manager_t* snd_manager_create(size_t chunk_size, uint32_t cnum);
+
+void snd_manager_destroy(cmt_recv_managet_t* cmt);
+
+cmt_tcp_send_t* snd_get(cmt_snd_manager_t* m);
+
+void free_snd(cmt_snd_manager_t* m, cmt_tcp_send_t* snd);
+
+cmt_recv_manager_t* recv_manager_create(size_t chunk_size, uint32_t cnum);
+
+void recv_manager_destroy(cmt_recv_manager_t* m);	
+
+cmt_tcp_recv_t* recv_get(cmt_recv_manager_t* m);
+
+void free_recv(cmt_recvb_manager_t* m, cmt_tcp_recv_t* r);
 
 #endif /** _TCP_BUFFER_INCLUDE_H_ */

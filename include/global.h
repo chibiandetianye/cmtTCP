@@ -81,6 +81,8 @@ log2_first_set(uint64_t x) {
 
 typedef uint64_t cmt_tid
 
+#define MAX(a, b) ((a)>(b)?(a):(b))
+#define MIN(a, b) ((a)<(b)?(a):(b))
 
 
 

@@ -13,6 +13,7 @@
 #include"addr_pool.h"
 #include"tcp_buffer.h"
 #include"io_module.h"
+#include"timer.h"
 
 #define DEFAULT_WORKING_LIST 4
 
@@ -122,9 +123,12 @@ typedef struct cmttcp_manager_per_cpu {
 	struct cmttcp_manager* manager;
 
 	cmt_pool_t* pool;
-	cmt_sb_manager_t* send_manager;
-	cmt_recv_manager_t* recv_manager;
+	cmt_sb_manager_t* sendb_manager;
+	cmt_recvb_manager_t* recvb_manager;
 	cmt_stream_manager_t* stream_manager;
+	cmt_recv_manager_t* recv_manager;
+	cmt_snd_manager_t* send_manager;
+	
 	cmt_sender_t* sender;
 
 	cmt_tcp_listener_t* listeners;
@@ -133,14 +137,19 @@ typedef struct cmttcp_manager_per_cpu {
 	cmttcp_recv_manager_t* recv_m _cache_aligned;
 
 	cmt_tcp_hashtable_t* tcp_flow_table;
-
 	cmt_sock_table_t* fd_table;
-
 	cmt_socket_map_t* smap;
-
 	addr_pool_t* addr_pool;
 
+	cmt_rto_hashstore_t* rto_list;
+	tailq_head* timewait_list;
+	tailq_head* timeout_list;
+
 	uint64_t flow_count;
+	
+	int rto_list_cnt;
+	int timewait_list_cnt;
+	int timeout_list_cnt;
 
 	struct {
 		uint8_t count;

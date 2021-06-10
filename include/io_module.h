@@ -27,7 +27,7 @@ extern cmt_thread_context_t;
 */
 typedef struct io_module_func {
 	void (*load_module)	(void);
-	void (*init_handle)	(cmt_threaad_context_t* ctx);
+	void (*init_handle)	(cmt_thread_context_t* ctx);
 	uint8_t* (*link_devices) (cmt_thread_context_t* ctx);
 	void (*release_pkt) (cmt_thread_context_t* ctx, int ifidx, unsigned char* pkt_data, int len);
 	int8_t* (*get_wptr) (cmt_thread_context_t* ctx, int ifidx, uint16_t len);

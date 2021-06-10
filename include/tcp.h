@@ -7,6 +7,8 @@
 #include"tcp_buffer.h"
 #include"queue.h"
 
+#define TCP_MAX_SEQ		4294967295
+
 typedef enum cmt_tcp_state {
 	CMT_TCP_CLOSE = 0,
 	CMT_TCP_LISTEN = 1,
@@ -66,6 +68,27 @@ typedef enum cmt_tcp_state {
 #define USEC_TO_SEC(t)			((t) / 1000000)
 
 #define TCP_INITIAL_RTO 		(MSEC_TO_USEC(500) / TIME_TICK)
+
+struct tcphdr {
+	unsigned short source;
+	unsigned short dest;
+	unsigned int seq;
+	unsigned int ack_seq;
+
+	unsigned short res1 : 4,
+		doff : 4,
+		fin : 1,
+		syn : 1,
+		rst : 1,
+		psh : 1,
+		ack : 1,
+		urg : 1,
+		ece : 1,
+		cwr : 1;
+	unsigned short window;
+	unsigned short check;
+	unsigned short urg_ptr;
+} _packed;
 
 enum tcp_option {
 	TCP_OPT_END				= 0,
@@ -203,17 +226,23 @@ typedef struct cmt_tcp_send {
 		is_fin_sent : 1,
 		is_fin_ackd : 1;
 
-	cmt_send_buffer_t* sndbuf;
+	list_node_t* control_link;
+	list_node_t* send_link;
+	list_node_t* ack_link;
+	list_node_t* timer_link;
+	list_node_t* timeout_link;
 
-} cmt_tcp_send_t;
+	cmt_send_buffer_t* sndbuf;
+} 
+cmt_tcp_send_t;
 
 typedef struct cmt_tcp_stream {
-	cmt_socket_t* socket;
+	cmt_socket_map_t* socket;
+	cmt_socket_t* s;
 	hash_bucket_t* next; //next tcp stream in hash table
 
 
-	uint32_t id : 24,
-		stream_type : 8;
+	uint8_t stream_type;
 
 	uint32_t saddr; /** in network order */
 	uint32_t daddr; /** in network order */
