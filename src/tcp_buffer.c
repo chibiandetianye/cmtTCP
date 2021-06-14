@@ -4,6 +4,7 @@
 #include"cmt_memory_pool.h"
 #include"tcp.h"
 #include"atomic.h"
+#include"debug"
 
 #define MAX(a, b) ((a)>(b)?(a):(b))
 #define MIN(a, b) ((a)<(b)?(a):(b))

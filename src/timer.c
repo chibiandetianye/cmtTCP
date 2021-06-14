@@ -7,7 +7,7 @@
 #include"tcp.h"
 
 cmt_rto_hashstore_t* 
-init_rtt_hashstore(void) {
+init_rto_hashstore(void) {
 	cmt_pool_t* pool = get_cmt_pool();
 	if (unlikely(pool == NULL)) {
 		printf("%d cannot get pool\n", __LINE__);
@@ -47,23 +47,23 @@ add_to_rto_list(cmttcp_manager_per_cpu_t* tcp, cmt_tcp_stream_t* cur_stream) {
 			int offset = cur_stream->snd->ts_rto % RTO_HASH;//(diff + tcp->rto_store->rto_now_idx) % RTO_HASH;
 			cur_stream->on_rto_idx = offset;
 			tailq_insert_tail(&(tcp->rto_store->rto_list[offset]),
-				cur_stream->sndvar->timer_link);
+				cur_stream->timer_link);
 		}
 		else {
 			cur_stream->on_rto_idx = RTO_HASH;
 			tailq_insert_tail(&(tcp->rto_store->rto_list[RTO_HASH]),
-				cur_stream->sndvar->timer_link);
+				cur_stream->timer_link);
 		}
 		tcp->rto_list_cnt++;
 	}
 }
 
 void 
-remove_from_rto_list(cmt_tcp_manager_per_cput_t* tcp, cmt_tcp_stream_t* cur_stream) {
+remove_from_rto_list(cmttcp_manager_per_cput_t* tcp, cmt_tcp_stream_t* cur_stream) {
 	if (cur_stream->on_rto_idx < 0) return;
 
 	tailq_remove(&(tcp->rto_store->rto_list[cur_stream->on_rto_idx]),
-		cur_stream->sndvar->timer_link);
+		cur_stream->timer_link);
 
 	cur_stream->on_rto_idx = -1;
 	tcp->rto_list_cnt--;
@@ -75,8 +75,8 @@ add_to_timewait_list(cmt_tcp_manager_per_cpu_t* tcp, cmt_tcp_stream_t* cur_strea
 
 	if (cur_stream->on_timewait_list) {
 		// Update list in sorted way by ts_tw_expire
-		tailq_remove(&tcp->timewait_list, cur_stream->sndvar->timer_link);
-		tailq_insert_tail(&tcp->timewait_list, cur_stream->sndvar->timer_link);
+		tailq_remove(&tcp->timewait_list, cur_stream->timer_link);
+		tailq_insert_tail(&tcp->timewait_list, cur_stream->timer_link);
 	}
 	else {
 		if (cur_stream->on_rto_idx >= 0) {
@@ -87,54 +87,54 @@ add_to_timewait_list(cmt_tcp_manager_per_cpu_t* tcp, cmt_tcp_stream_t* cur_strea
 		}
 
 		cur_stream->on_timewait_list = 1;
-		tailq_insert_tail(&tcp->timewait_list, cur_stream->sndvar->timer_link);
+		tailq_insert_tail(&tcp->timewait_list, cur_stream->timer_link);
 		tcp->timewait_list_cnt++;
 	}
 }
 
 void 
-remove_from_timewait_list(cmt_tcp_manager_t* tcp, cmt_tcp_stream_t* cur_stream) {
+remove_from_timewait_list(cmttcp_manager_t* tcp, cmt_tcp_stream_t* cur_stream) {
 	if (!cur_stream->on_timewait_list) {
 		assert(0);
 		return;
 	}
 
-	tailq_remove(&tcp->timewait_list, cur_stream->sndvar->timer_link);
+	tailq_remove(&tcp->timewait_list, cur_stream->timer_link);
 	cur_stream->on_timewait_list = 0;
 	tcp->timewait_list_cnt--;
 }
 
 void 
-add_to_timeout_list(cmt_tcp_manager_per_cpu_t* tcp, cmt_tcp_stream_t* cur_stream) {
+add_to_timeout_list(cmttcp_manager_per_cpu_t* tcp, cmt_tcp_stream_t* cur_stream) {
 	if (cur_stream->on_timeout_list) {
 		assert(0);
 		return;
 	}
 
 	cur_stream->on_timeout_list = 1;
-	tailq_insert_tail(&tcp->timeout_list, cur_stream->sndvar->timeout_link);
+	tailq_insert_tail(&tcp->timeout_list, cur_stream->timeout_link);
 	tcp->timeout_list_cnt++;
 }
 
 void 
-remove_from_timeout_list(cmt_tcp_manager_per_cpu_t* tcp, cmt_tcp_stream_t* cur_stream) {
+remove_from_timeout_list(cmttcp_manager_per_cpu_t* tcp, cmt_tcp_stream_t* cur_stream) {
 	if (cur_stream->on_timeout_list) {
 		cur_stream->on_timeout_list = 0;
-		tailq_remove(&tcp->timeout_list, cur_stream->sndvar->timeout_link);
+		tailq_remove(&tcp->timeout_list, cur_stream->timeout_link);
 		tcp->timeout_list_cnt--;
 	}
 }
 
 void 
-update_timeout_list(cmt_tcp_manager_per_cpu_t* tcp, cmt_tcp_stream_t* cur_stream) {
+update_timeout_list(cmttcp_manager_per_cpu_t* tcp, cmt_tcp_stream_t* cur_stream) {
 	if (cur_stream->on_timeout_list) {
-		tailq_remove(&tcp->timeout_list, cur_stream, snd->timeout_link);
-		tailq_insert_tail(&tcp->timeout_list, cur_stream, snd->timeout_link);
+		tailq_remove(&tcp->timeout_list, cur_stream->timeout_link);
+		tailq_insert_tail(&tcp->timeout_list, cur_stream->timeout_link);
 	}
 }
 
 void 
-update_retransmission_timer(cmt_tcp_manager_per_cpu_t* tcp,
+update_retransmission_timer(cmttcp_manager_per_cpu_t* tcp,
 	cmt_tcp_stream_t* cur_stream, uint32_t cur_ts) {
 	assert(cur_stream->snd->rto > 0);
 	cur_stream->snd->nrtx = 0;
@@ -156,7 +156,7 @@ update_retransmission_timer(cmt_tcp_manager_per_cpu_t* tcp,
 }
 
 int 
-handle_rto(cmt_tcp_manager_per_cpu_t* tcp, uint32_t cur_ts, cmt_tcp_stream_t* cur_stream) {
+handle_rto(cmttcp_manager_per_cpu_t* tcp, uint32_t cur_ts, cmt_tcp_stream_t* cur_stream) {
 
 	uint8_t backoff;
 
@@ -313,32 +313,33 @@ handle_rto(cmt_tcp_manager_per_cpu_t* tcp, uint32_t cur_ts, cmt_tcp_stream_t* cu
 
 
 always_inline void 
-rearrange_rto_store(nty_tcp_manager* tcp) {
-	nty_tcp_stream* walk, * next;
-	struct rto_head* rto_list = &tcp->rto_store->rto_list[RTO_HASH];
+rearrange_rto_store(cmttcp_manager_per_cpu_t* tcp) {
+	list_node_t* walk, * next;
+	tailq_head_t* rto_list = &tcp->rto_list->rto_list[RTO_HASH];
 	int cnt = 0;
 
-	for (walk = TAILQ_FIRST(rto_list);
+	for (walk = tailq_first(rto_list);
 		walk != NULL; walk = next) {
-		next = TAILQ_NEXT(walk, snd->timer_link);
+		next = tailq_next(walk);
 
-		int diff = (int32_t)(tcp->rto_store->rto_now_ts - walk->snd->ts_rto);
+		int diff = (int32_t)(tcp->rto_store->rto_now_ts - walk->sndvar->ts_rto);
 		if (diff < RTO_HASH) {
 			int offset = (diff + tcp->rto_store->rto_now_idx) % RTO_HASH;
-			TAILQ_REMOVE(&tcp->rto_store->rto_list[RTO_HASH],
-				walk, snd->timer_link);
+			tailq_remove(&tcp->rto_store->rto_list[RTO_HASH],
+				walk);
 			walk->on_rto_idx = offset;
-			TAILQ_INSERT_TAIL(&(tcp->rto_store->rto_list[offset]),
-				walk, snd->timer_link);
+			tailq_insert_tail(&(tcp->rto_store->rto_list[offset]),
+				timer_link);
 		}
 		cnt++;
 	}
 }
 
 
-void check_rtm_timeout(cmt_tcp_manager_per_cpu_t* tcp, uint32_t cur_ts, int thresh) {
+void 
+check_rtm_timeout(cmttcp_manager_per_cpu_t* tcp, uint32_t cur_ts, int thresh) {
 
-	cmt_tcp_stream_t* walk, * next;
+	list_node_t* walk, * next;
 	struct rto_head* rto_list;
 
 	if (!tcp->rto_list_cnt) {
@@ -354,13 +355,13 @@ void check_rtm_timeout(cmt_tcp_manager_per_cpu_t* tcp, uint32_t cur_ts, int thre
 			break;
 		}
 
-		for (walk = TAILQ_FIRST(rto_list); walk != NULL; walk = next) {
+		for (walk = tailq_first(rto_list); walk != NULL; walk = next) {
 			if (++cnt > thresh) break;
 
 			next = TAILQ_NEXT(walk, snd->timer_link);
 
 			if (walk->on_rto_idx >= 0) {
-				TAILQ_REMOVE(rto_list, walk, snd->timer_link);
+				tailq_remove(rto_list, walk);
 				tcp->rto_list_cnt--;
 
 				walk->on_rto_idx = -1;
@@ -368,7 +369,7 @@ void check_rtm_timeout(cmt_tcp_manager_per_cpu_t* tcp, uint32_t cur_ts, int thre
 
 			}
 			else {
-				nty_trace_timer("Stream %d: not on rto list.\n", walk->id);
+				printf("Stream %d: not on rto list.\n", walk->id);
 			}
 		}
 

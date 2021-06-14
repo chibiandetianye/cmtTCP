@@ -12,6 +12,6 @@ typedef struct cmt_rto_hashstore {
 	tailq_head_t rto_list[RTO_HASH + 1];
 } cmt_rto_hashstore_t;
 
-cmt_rto_hashstore_t* InitRTOHashstore(void);
+cmt_rto_hashstore_t* init_rto_hashstore(void);
 
 #endif /** _TIMER_INCLUDE_H_ */

@@ -9,6 +9,8 @@
 
 #define TCP_MAX_SEQ		4294967295
 
+#define TCP_HEADER_LEN	20
+
 typedef enum cmt_tcp_state {
 	CMT_TCP_CLOSE = 0,
 	CMT_TCP_LISTEN = 1,
@@ -201,7 +203,7 @@ typedef struct cmt_tcp_send {
 	uint8_t nrtx; /** number of retransmission */
 	uint8_t max_nrtx; /** max number of retransmission */
 	uint32_t rto; /** retransmission  timeout */
-	uint32_t rs_rto; /** timestamp for retransmision  timeout */
+	uint32_t ts_rto; /** timestamp for retransmision  timeout */
 
 	/** congestion control variable */
 	uint32_t cwnd;		/** congestion window */
@@ -226,17 +228,17 @@ typedef struct cmt_tcp_send {
 		is_fin_sent : 1,
 		is_fin_ackd : 1;
 
+	cmt_send_buffer_t* sndbuf;
+} 
+cmt_tcp_send_t;
+
+typedef struct cmt_tcp_stream {
 	list_node_t* control_link;
 	list_node_t* send_link;
 	list_node_t* ack_link;
 	list_node_t* timer_link;
 	list_node_t* timeout_link;
 
-	cmt_send_buffer_t* sndbuf;
-} 
-cmt_tcp_send_t;
-
-typedef struct cmt_tcp_stream {
 	cmt_socket_map_t* socket;
 	cmt_socket_t* s;
 	hash_bucket_t* next; //next tcp stream in hash table
