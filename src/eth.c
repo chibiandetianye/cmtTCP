@@ -10,6 +10,7 @@
 
 #include"eth.h"
 #include"cmtTCP.h"
+#include"debug.h"
 
 int 
 process_packet(const int ifidx, uint32_t cur_ts, unsigned char* pkt_data,
@@ -20,11 +21,11 @@ process_packet(const int ifidx, uint32_t cur_ts, unsigned char* pkt_data,
 
 	if (ip_proto == ETH_P_IP) {
 		/* process ipv4 packet */
-		ret = ProcessIPv4Packet(cur_ts, ifidx, pkt_data, len);
+		ret = process_IPv4_packet(cur_ts, ifidx, pkt_data, len);
 
 	}
 	else if (ip_proto == ETH_P_ARP) {
-		ProcessARPPacket(cur_ts, ifidx, pkt_data, len);
+		process_ARP_packet(cur_ts, ifidx, pkt_data, len);
 		return 0;
 
 	}
@@ -49,13 +50,13 @@ ethernet_output(uint16_t h_proto,
 	 * return early if no interface is set (if routing entry does not exist)
 	 */
 	if (nif < 0) {
-		TRACE_INFO("No interface set!\n");
+		trace_message(stdout, "No interface set!\n");
 		return NULL;
 	}
 
 	eidx = config.nif_to_eidx[nif];
 	if (eidx < 0) {
-		TRACE_INFO("No interface selected!\n");
+		trace_message(stdout"No interface selected!\n");
 		return NULL;
 	}
 	buf = mtcp->iom->get_wptr(mtcp->ctx, eidx, iplen + ETHERNET_HEADER_LEN);

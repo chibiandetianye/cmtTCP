@@ -121,12 +121,12 @@ cmt_recvb_manager_t* recv_manager_create(size_t chunk_size, uint32_t cnum);
 
 void recvb_manager_destroy(cmt_recvb_managet_t* cmt);
 
-cmt_recv_buffer_t* recv_get(cmt_recvb_manager_t* cmt);
+cmt_recv_buffer_t* recv_get(cmt_recvb_manager_t* cmt, uint32_t init_seq);
 
 void free_recvb(cmt_recvb_manager_t* cmt);
 
 int recv_put(cmt_recv_manager_t* rbm, cmt_recv_buffer_t* buff,
-	void* data, char* stream, uint32_t len, uint32_t cur_seq);
+	void* data, uint32_t len, uint32_t cur_seq);
 
 size_t recv_remove(cmt_recvb_manager_t* rbm, cmt_recv_buffer* buff, size_t len, int option);
 

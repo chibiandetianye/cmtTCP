@@ -229,8 +229,7 @@ typedef struct cmt_tcp_send {
 		is_fin_ackd : 1;
 
 	cmt_send_buffer_t* sndbuf;
-} 
-cmt_tcp_send_t;
+} cmt_tcp_send_t;
 
 typedef struct cmt_tcp_stream {
 	list_node_t* control_link;

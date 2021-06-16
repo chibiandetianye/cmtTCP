@@ -373,7 +373,7 @@ merge_fragments(cmt_fragment_t* a, cmt_fragment_t* b) {
 
 int 
 recv_put(cmt_recv_manager_t* rbm, cmt_recv_buffer_t* buff,
-	void* data, char* stream, uint32_t len, uint32_t cur_seq) {
+	void* data, uint32_t len, uint32_t cur_seq) {
 	cmt_data_ptr* data_ptr;
 	cmt_fragment_t* frag;
 	int putx, end_off;

@@ -429,9 +429,12 @@ _cmt_ring_mc_do_dequeue(cmt_ring_t* r, void** obj_table, unsigned n) {
         cons_head = r->cons.head;
         prod_tail = r->prod.tail;
 
-        entries = (prod_tail - cons_head);
+        entries = (mask + prod_tail - cons_head) & (mask + 1);
 
         if (n > entries) {
+            if (unlikely(entries == 0)) {
+                return 0;
+            }
             n = entries;
         }
 
@@ -478,7 +481,7 @@ _cmt_ring_sp_do_enqueue(cmt_ring_t* r, void* const *obj_table,
 
     prod_head = ACQUIRE(&r->prod.head);
     cons_tail = ACQUIRE(&r->cons.tail);
-    free_entries = (mask + cons_tail - prod_head);
+    free_entries = (mask + cons_tail - prod_head) & (mask +1);
 
     if (n > free_entries) {
         return -1;

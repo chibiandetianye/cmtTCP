@@ -20,18 +20,20 @@ struct iphdr {
 } _packed;
 
 /**	\brief process a ipv4 packet 
+	--------------------------------------------------------
 	@param cur_ts current timestamps
 	@param ifidx no. nic interface
 	@param pkt_data packet data which used to be processing
 	@param len length of packet data
 */
-int pocess_IPv4_packet(uint32_t cur_ts,
+int process_IPv4_packet(uint32_t cur_ts,
 	const int ifidx, unsigned char* pkt_data, int len);
 
 
 void forward_IPv4_packet(int nif_in, char* buf, int len);
 
-/** request a ip packet from other netwokr layer
+/** \brief request a ip packet from other netwokr layer
+	-------------------------------------------------------------
 	@param protocol the protocol of data type of the payload part
 	@param ip_id id of ip packet 
 	@param saddr source ip address

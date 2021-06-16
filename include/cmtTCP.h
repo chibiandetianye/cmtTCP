@@ -79,6 +79,11 @@ typedef enum sched_stat {
 	DISABLE
 } sched_stat;
 
+/**	\brief Data structure for recording thread information
+	------------------------------------------------------
+	Each thread has a unique data structure that records the 
+	information and status of the current thread
+*/
 typedef struct cmt_thread_context {
 	char name[MAX_THREAD_NAME];
 	int cpu;
@@ -86,6 +91,13 @@ typedef struct cmt_thread_context {
 	sched_stat state;
 } cmt_thread_context_t;
 
+/**	\brief Data structure for working thread
+	-------------------------------------------------------
+	Created by the main thread, when the main thread receives
+	the data packet, the data packet is passed to the worker
+	thread to process the corresponding data link layer and 
+	network layer information
+*/
 typedef struct working_list_context {
 	cmt_thread_context_t cpu_context __attribute__((packed));
 	
@@ -118,24 +130,41 @@ typedef struct working_list_context {
 
 extern struct cmttcp_manager;
 
+/**	\brief Data structure for managering tcp process flow
+	-----------------------------------------------------
+	Created by the main thread, each thread occupies a core,
+	which is responsible for receiving data packets from the
+	worker threads or sending data packets to the worker 
+	threads for processing. Process multiple tcp packets 
+	in a single thread
+*/
 typedef struct cmttcp_manager_per_cpu {
 	cmt_thread_context* ctx;
 	struct cmttcp_manager* manager;
 
+	/*
+	memory manager
+	*/
 	cmt_pool_t* pool;
 	cmt_sb_manager_t* sendb_manager;
 	cmt_recvb_manager_t* recvb_manager;
 	cmt_stream_manager_t* stream_manager;
 	cmt_recv_manager_t* recv_manager;
 	cmt_snd_manager_t* send_manager;
-	
+
+	/*
+	 queue for recieving or sending data packet
+	*/
+	cmt_ring_t* send_ring _cache_aligned;
+	cmt_ring_t* recv_ring _cache_aligned;
+
 	cmt_sender_t* sender;
 
 	cmt_tcp_listener_t* listeners;
 
-	cmttcp_send_manager_t* send_m _cache_aligned;
-	cmttcp_recv_manager_t* recv_m _cache_aligned;
-
+	/*
+		record tcp information
+	*/
 	cmt_tcp_hashtable_t* tcp_flow_table;
 	cmt_sock_table_t* fd_table;
 	cmt_socket_map_t* smap;
@@ -151,6 +180,10 @@ typedef struct cmttcp_manager_per_cpu {
 	int timewait_list_cnt;
 	int timeout_list_cnt;
 
+	/*
+		used to synchronize information 
+		between threads
+	*/
 	struct {
 		uint8_t count;
 		uint32_t ready;
@@ -165,13 +198,15 @@ typedef struct cmttcp_manager_per_cpu {
 
 } cmttcp_manager_per_cpu_t;
 
-extern struct cmttcp_working_list_context;
 
+/*	\brief Data structure for managing all tcp processing threads
+	-------------------------------------------------------------
+*/
 typedef struct cmttcp_manager {
 	int nums_working_tcp_cores;
 	int nums_working_cores;
 	cmttcp_manager_per_cpu_t* tcp_mpercpu[MAXCPUS];
-	struct cmttcp_working_list_context* working_thread[DEFAULT_WORKING_LIST];
+	struct working_list_context* working_thread[DEFAULT_WORKING_LIST];
 
 	struct io_module_func* io_module;
 
@@ -184,32 +219,13 @@ typedef struct cmttcp_manager {
 	cmt_socket_table_t* fdtable;
 } cmttcp_manager_t;
 
-typedef struct cmttcp_working_list_context {
-	cmt_thread_context_t _packed;
-	
-	cmt_pool_t* pool;
-	
-	cmttcp_manager_t* manager;
-
-	cmt_ring_t* recv_ring _cache_aligned;
-	cmt_ring_t* send_ring _cache_aligned;
-
-	struct {
-		uint8_t count;
-		uint32_t ready;
-	} poll_flag _cache_aligned;
-
-	struct {
-		pthread_cond_t cond;
-		pthread_mutex_t lock;
-		uint64_t prev_end;
-		unit64_t start_timestamp;
-	} pv_flag;
-} cmttcp_working_list_context_t;
-
-
-
+/*	\brief get tcp manager
+*/
 cmttcp_manager_t* get_cmttcp_manager();
+
+/*	\brief initiliaze the moduel
+*/
+int cmttcp_init();
 
 extern cmttcp_config_t* cmttcp_config;
 extern cmttcp_manager_t* cmttcp_manager;

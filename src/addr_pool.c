@@ -1,11 +1,13 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <pthread.h>
+#include<stdio.h>
+#include<stdlib.h>
+#include<pthread.h>
 #include<stdint.h>
 
-#include "addr_pool.h"
-#include "rss.h"
+#include"addr_pool.h"
+#include"rss.h"
 #include"queue.h"
+#include"global.h"
+#include"debug.h"
 
 typedef struct addr_entry
 {
@@ -43,7 +45,7 @@ typedef struct addr_pool
 #define get_addr_node(n)	((addr_entry_t*)(n))
 
 addr_pool_t*
-CreateAddressPool(in_addr_t addr_base, int num_addr)
+create_address_pool(in_addr_t addr_base, int num_addr)
 {
 	struct addr_pool* ap;
 	int num_entry;
@@ -58,7 +60,9 @@ CreateAddressPool(in_addr_t addr_base, int num_addr)
 	/* initialize address pool */
 	num_entry = num_addr * (MAX_PORT - MIN_PORT);
 	ap->pool = (addr_entry_t*)calloc(num_entry, sizeof(addr_entry_t));
-	if (!ap->pool) {
+	if (unlikely(!ap->pool)) {
+		trace_error(stderr, 
+			"bad alloc: failed to get address pool from calloc\n");
 		free(ap);
 		return NULL;
 	}
@@ -66,6 +70,8 @@ CreateAddressPool(in_addr_t addr_base, int num_addr)
 	/* initialize address map */
 	ap->mapper = (struct addr_map*)calloc(num_addr, sizeof(struct addr_map));
 	if (!ap->mapper) {
+		trace_error(stderr,
+			"bad alloc: failed to get mapper from calloc\n");
 		free(ap->pool);
 		free(ap);
 		return NULL;
@@ -79,6 +85,8 @@ CreateAddressPool(in_addr_t addr_base, int num_addr)
 #else
 	if (pthread_mutex_init(&ap->lock, NULL)) {
 #endif /* SPINLOCK_ADDR_POOL */
+		trace_error(stderr,
+			"failed to init mutex\n");
 		free(ap->pool);
 		free(ap);
 		return NULL;
@@ -120,9 +128,9 @@ CreateAddressPool(in_addr_t addr_base, int num_addr)
 
 	return ap;
 }
-/*----------------------------------------------------------------------------*/
+
 addr_pool_t*
-CreateAddressPoolPerCore(int core, int num_queues,
+create_address_pool_per_core(int core, int num_queues,
 	in_addr_t saddr_base, int num_addr, in_addr_t daddr, in_port_t dport)
 {
 	struct addr_pool* ap;
@@ -140,13 +148,18 @@ CreateAddressPoolPerCore(int core, int num_queues,
 //#endif
 
 	ap = (addr_pool_t*)calloc(1, sizeof(addr_pool_t));
-	if (!ap)
+	if (!ap) {
+		trace_error(stderr,
+			"bad alloc: failed to get address pool from calloc\n");
 		return NULL;
+	}
 
 	/* initialize address pool */
 	num_entry = (num_addr * (MAX_PORT - MIN_PORT)) / num_queues;
 	ap->pool = (addr_entry_t*)calloc(num_entry, sizeof(addr_entry_t));
 	if (!ap->pool) {
+		trace_error(stderr,
+			"bad alloc: failed to get mapper from calloc\n");
 		free(ap);
 		return NULL;
 	}
@@ -162,15 +175,21 @@ CreateAddressPoolPerCore(int core, int num_queues,
 	tailq_init(&ap->free_list);
 	tailq_init(&ap->used_list);
 
+#ifdef SPINLOCK_ADDR_POOL
+	if (pthread_spin_init(&ap->lock, NULL)) {
+#else
 	if (pthread_mutex_init(&ap->lock, NULL)) {
+#endif /* SPINLOCK_ADDR_POOL */
+		trace_error(stderr,
+			"failed to init mutex\n");
 		free(ap->pool);
 		free(ap);
 		return NULL;
 	}
 
 #ifdef SPINLOCK_ADDR_POOL
-	pthread_spin_init(&ap->lock);
-#else
+	pthread_spin_lock(&ap->lock)
+#else /* SPINLOCK_ADDR_POOL */
 	pthread_mutex_lock(&ap->lock);
 #endif /** SPINLOCK_ADDR_POOL */
 
@@ -219,7 +238,7 @@ CreateAddressPoolPerCore(int core, int num_queues,
 }
 
 void
-DestroyAddressPool(addr_pool_t* ap)
+destroy_address_pool(addr_pool_t* ap)
 {
 	if (!ap)
 		return;
@@ -234,13 +253,16 @@ DestroyAddressPool(addr_pool_t* ap)
 		ap->mapper = NULL;
 	}
 
+#ifdef SPINLOCK_ADDR_POOL
+	pthread_spin_destroy(&ap->lock);
+#else
 	pthread_mutex_destroy(&ap->lock);
-
+#endif
 	free(ap);
 }
 
 int
-FetchAddress(addr_pool_t* ap, int core, int num_queues,
+fetch_address(addr_pool_t* ap, int core, int num_queues,
 	const struct sockaddr_in* daddr, struct sockaddr_in* saddr)
 {
 	list_node_t* walk, * next;
@@ -309,7 +331,7 @@ FetchAddress(addr_pool_t* ap, int core, int num_queues,
 }
 
 int
-FetchAddressPerCore(addr_pool_t* ap, int core, int num_queues,
+fetch_address_per_core(addr_pool_t* ap, int core, int num_queues,
 	const struct sockaddr_in* daddr, struct sockaddr_in* saddr)
 {
 	list_node_t* walk;
@@ -345,9 +367,9 @@ FetchAddressPerCore(addr_pool_t* ap, int core, int num_queues,
 
 	return ret;
 }
-/*----------------------------------------------------------------------------*/
+
 int
-FreeAddress(addr_pool_t* ap, const struct sockaddr_in* addr)
+free_address(addr_pool_t* ap, const struct sockaddr_in* addr)
 {
 	addr_entry_t* walk, * next;
 	list_node_t* walk_value;
@@ -408,4 +430,3 @@ FreeAddress(addr_pool_t* ap, const struct sockaddr_in* addr)
 
 	return ret;
 }
-/*----------------------------------------------------------------------------*/

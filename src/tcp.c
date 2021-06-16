@@ -10,6 +10,11 @@
 #include"tcp_stream.h"
 #include"debug.h"
 
+/** \brief Parse the length of the tcp option field
+	---------------------------------------------------------
+	@param flags tcp option
+	@return length of tcp option
+*/
 always_inline uint16_t 
 cmt_calculate_option(uint8_t flags) {
 	uint16_t optlen = 0;
@@ -28,6 +33,11 @@ cmt_calculate_option(uint8_t flags) {
 	return optlen;
 }
 
+/** \brief Calculate the tcp header size
+	-----------------------------------------------------------
+	@param buf 
+
+*/
 always_inline uint16_t 
 cmt_tcp_calculate_checksum(uint16_t* buf, uint16_t len, uint32_t saddr, uint32_t daddr)
 {
@@ -423,7 +433,7 @@ cmt_tcp_active_open(cmttcp_manager_per_cpu_t* tcp, cmt_tcp_stream_t* cur_stream,
 }
 
 always_inline int 
-cmt_tcp_validseq(cmt_tcp_manager_per_cpu_t* tcp, cmt_tcp_stream_t* cur_stream, uint32_t cur_ts,
+cmt_tcp_validseq(cmttcp_manager_per_cpu_t* tcp, cmt_tcp_stream_t* cur_stream, uint32_t cur_ts,
 	struct tcphdr* tcph, uint32_t seq, uint32_t ack_seq, int payloadlen) {
 	if (!tcph->rst && cur_stream->saw_timestamp) {
 		cmt_tcp_timestamp ts;
@@ -484,7 +494,7 @@ cmt_tcp_validseq(cmt_tcp_manager_per_cpu_t* tcp, cmt_tcp_stream_t* cur_stream, u
 
 
 static cmt_tcp_stream_t* 
-cmt_create_stream(cmt_tcp_manager_t* tcp, uint32_t cur_ts, const struct iphdr* iph,
+cmt_create_stream(cmttcp_manager_t* tcp, uint32_t cur_ts, const struct iphdr* iph,
 	int ip_len, const struct tcphdr* tcph, uint32_t seq, uint32_t ack_seq,
 	int payloadlen, uint16_t window) {
 	nty_tcp_stream* cur_stream;
@@ -535,7 +545,7 @@ cmt_create_stream(cmt_tcp_manager_t* tcp, uint32_t cur_ts, const struct iphdr* i
 
 
 static void 
-cmt_tcp_handle_listen(cmt_tcp_manager_per_cpu_t* tcp, uint32_t cur_ts,
+cmt_tcp_handle_listen(cmttcp_manager_per_cpu_t* tcp, uint32_t cur_ts,
 	cmt_tcp_stream_t* cur_stream, struct tcphdr* tcph) {
 	if (tcph->syn) {
 		if (cur_stream->state == NTY_TCP_LISTEN) {
@@ -555,7 +565,7 @@ cmt_tcp_handle_listen(cmt_tcp_manager_per_cpu_t* tcp, uint32_t cur_ts,
 }
 
 static void 
-cmt_tcp_handle_syn_sent(cmt_tcp_manager_per_cpu_t* tcp, uint32_t cur_ts,
+cmt_tcp_handle_syn_sent(cmttcp_manager_per_cpu_t* tcp, uint32_t cur_ts,
 	cmt_tcp_stream_t* cur_stream, const struct iphdr* iph, struct tcphdr* tcph,
 	uint32_t seq, uint32_t ack_seq, int payloadlen, uint16_t window) {
 	if (tcph->ack) {
@@ -625,7 +635,7 @@ cmt_tcp_handle_syn_sent(cmt_tcp_manager_per_cpu_t* tcp, uint32_t cur_ts,
 
 
 static void 
-cmt_tcp_handle_syn_rcvd(cmt_tcp_manager_per_cpu_t* tcp, uint32_t cur_ts,
+cmt_tcp_handle_syn_rcvd(cmttcp_manager_per_cpu_t* tcp, uint32_t cur_ts,
 	cmt_tcp_stream_t* cur_stream, struct tcphdr* tcph, uint32_t ack_seq) {
 
 	cmt_tcp_send_t* snd = cur_stream->sndvar;
@@ -687,7 +697,7 @@ cmt_tcp_handle_syn_rcvd(cmt_tcp_manager_per_cpu_t* tcp, uint32_t cur_ts,
 }
 
 static void 
-cmt_tcp_handle_established(cmt_tcp_manager_per_cpu_t* tcp, uint32_t cur_ts,
+cmt_tcp_handle_established(cmttcp_manager_per_cpu_t* tcp, uint32_t cur_ts,
 	cmt_tcp_stream_t* cur_stream, struct tcphdr* tcph, uint32_t seq, uint32_t ack_seq,
 	uint8_t* payload, int payloadlen, uint16_t window) {
 	if (tcph->syn) {
@@ -743,7 +753,7 @@ cmt_tcp_handle_established(cmt_tcp_manager_per_cpu_t* tcp, uint32_t cur_ts,
 }
 
 void 
-cmt_tcp_handle_last_ack(cmt_tcp_manager_per_cpu_t* tcp, uint32_t cur_ts, 
+cmt_tcp_handle_last_ack(cmttcp_manager_per_cpu_t* tcp, uint32_t cur_ts, 
 	const struct iphdr* iph, int ip_len, 
 	cmt_tcp_stream_t* cur_stream, struct tcphdr* tcph,
 	uint32_t seq, uint32_t ack_seq, int payloadlen, uint16_t window) {
@@ -794,7 +804,7 @@ cmt_tcp_handle_last_ack(cmt_tcp_manager_per_cpu_t* tcp, uint32_t cur_ts,
 }
 
 void 
-cmt_tcp_handle_fin_wait_1(cmt_tcp_manager_per_cpu_t* tcp, uint32_t cur_ts,
+cmt_tcp_handle_fin_wait_1(cmttcp_manager_per_cpu_t* tcp, uint32_t cur_ts,
 	cmt_tcp_stream_t* cur_stream, struct tcphdr* tcph, uint32_t seq, uint32_t ack_seq,
 	uint8_t* payload, int payloadlen, uint16_t window) {
 	if (TCP_SEQ_LT(seq, cur_stream->rcv_nxt)) {
@@ -870,7 +880,7 @@ cmt_tcp_handle_fin_wait_1(cmt_tcp_manager_per_cpu_t* tcp, uint32_t cur_ts,
 }
 
 void 
-cmt_tcp_handle_fin_wait_2(cmt_tcp_manager_per_cpu_t* tcp, uint32_t cur_ts,
+cmt_tcp_handle_fin_wait_2(cmttcp_manager_per_cpu_t* tcp, uint32_t cur_ts,
 	cmt_tcp_stream_t* cur_stream, struct tcphdr* tcph, uint32_t seq, uint32_t ack_seq,
 	uint8_t* payload, int payloadlen, uint16_t window) {
 
@@ -908,7 +918,7 @@ cmt_tcp_handle_fin_wait_2(cmt_tcp_manager_per_cpu_t* tcp, uint32_t cur_ts,
 }
 
 void 
-cmt_tcp_handle_closing(cmt_tcp_manager_per_cpu_t* tcp, uint32_t cur_ts,
+cmt_tcp_handle_closing(cmttcp_manager_per_cpu_t* tcp, uint32_t cur_ts,
 	cmt_tcp_stream_t* cur_stream, struct tcphdr* tcph, uint32_t seq, uint32_t ack_seq,
 	int payloadlen, uint16_t window) {
 
@@ -945,7 +955,7 @@ cmt_tcp_handle_closing(cmt_tcp_manager_per_cpu_t* tcp, uint32_t cur_ts,
 }
 
 void 
-cmt_tcp_estimate_rtt(nty_tcp_manager* tcp, nty_tcp_stream* cur_stream, uint32_t mrtt) {
+cmt_tcp_estimate_rtt(cmttcp_manager_per_cpu_t* tcp, cmt_tcp_stream_t* cur_stream, uint32_t mrtt) {
 
 #define TCP_RTO_MIN		0
 	long m = mrtt;
@@ -991,17 +1001,19 @@ cmt_tcp_estimate_rtt(nty_tcp_manager* tcp, nty_tcp_stream* cur_stream, uint32_t 
 		rcv->rtt_seq = cur_stream->snd_nxt;
 	}
 
-	nty_trace_tcp("mrtt: %u (%uus), srtt: %u (%ums), mdev: %u, mdev_max: %u, "
+	trace_message(stdout, tcp->ctx->cpu, tcp->ctx->tid, 
+		"mrtt: %u (%uus), srtt: %u (%ums), mdev: %u, mdev_max: %u, "
 		"rttvar: %u, rtt_seq: %u\n", mrtt, mrtt * TIME_TICK,
 		rcv->srtt, TS_TO_MSEC((rcv->srtt) >> 3), rcv->mdev,
 		rcv->mdev_max, rcv->rttvar, rcv->rtt_seq);
 
 }
 
-static int nty_tcp_process_payload(nty_tcp_manager* tcp, nty_tcp_stream* cur_stream,
+static int 
+cmt_tcp_process_payload(cmttcp_manager_per_cpu_t* tcp, cmt_tcp_stream_t* cur_stream,
 	uint32_t cur_ts, uint8_t* payload, uint32_t seq, int payloadlen) {
 
-	nty_tcp_recv* rcv = cur_stream->rcv;
+	cmt_tcp_recv* rcv = cur_stream->rcvvar;
 
 	if (TCP_SEQ_LT(seq + payloadlen, cur_stream->rcv_nxt)) {
 		return 0;
@@ -1011,71 +1023,45 @@ static int nty_tcp_process_payload(nty_tcp_manager* tcp, nty_tcp_stream* cur_str
 		return 0;
 	}
 
-	if (!rcv->recvbuf) {
-		nty_trace_tcp("nty_tcp_process_payload --> \n");
-		rcv->recvbuf = RBInit(tcp->rbm_rcv, rcv->irs + 1);
-		if (!rcv->recvbuf) {
-			cur_stream->state = NTY_TCP_CLOSED;
+	if (!rcv->rcvbuf) {
+		trace_message(stdout, tcp->ctx->cpu, tcp->ctx->tid, 
+			"nty_tcp_process_payload --> \n");
+		rcv->rcvbuf = recv_get(tcp->rbm_rcv, rcv->irs + 1);
+		if (!rcv->rcvbuf) {
+			trace_error(stderr, tcp->ctx->cpu, tcp->ctx->tid,
+				"bad alloc: failed to create rcvbuf");
+			cur_stream->state = CMT_TCP_CLOSED;
 			cur_stream->close_reason = TCP_NO_MEM;
 			//Raise Error Event
-			nty_trace_tcp(" Raise Error Event \n");
-
+			trace_message(stdout, tcp->ctx->cpu, tcp->ctx->tid,
+				" Raise Error Event \n");
 			return -1;
 		}
 	}
 
-#if NTY_ENABLE_BLOCKING
-	if (pthread_mutex_lock(&rcv->read_lock)) {
-		if (errno == EDEADLK) {
-			perror("ProcessTCPPayload: read_lock blocked\n");
-		}
-		assert(0);
-	}
-#else
-	if (SBUF_LOCK(&rcv->read_lock)) {
-		if (errno == EDEADLK) {
-			perror("ProcessTCPPayload: read_lock blocked\n");
-		}
-		assert(0);
-	}
-#endif
 	uint32_t prev_rcv_nxt = cur_stream->rcv_nxt;
-	int ret = RBPut(tcp->rbm_rcv, rcv->recvbuf, payload, (uint32_t)payloadlen, seq);
+	int ret = recv_put(tcp->recvb_manager, rcv->recvbuf, payload, (uint32_t)payloadlen, seq);
 	if (ret < 0) {
-		nty_trace_tcp("Cannot merge payload. reason: %d\n", ret);
+		trace_message(stdout, tcp->ctx->cpu, tcp->ctx->tid,
+			"cannot merge payload. reason: %d\n", ret);
 	}
 
-	if (cur_stream->state == NTY_TCP_FIN_WAIT_1 ||
-		cur_stream->state == NTY_TCP_FIN_WAIT_2) {
-		RBRemove(tcp->rbm_rcv, rcv->recvbuf, rcv->recvbuf->merged_len, AT_MTCP);
+	if (cur_stream->state == CMT_TCP_FIN_WAIT_1 ||
+		cur_stream->state == CMT_TCP_FIN_WAIT_2) {
+		recv_remove(tcp->recvb_manager, rcv->rcvbuf,
+			rcv->rcvbuf->merged_len, AT_MTCP);
 	}
 
 	cur_stream->rcv_nxt = rcv->recvbuf->head_seq + rcv->recvbuf->merged_len;
-	rcv->rcv_wnd = rcv->recvbuf->size - rcv->recvbuf->merged_len;
-#if NTY_ENABLE_BLOCKING
-	pthread_mutex_unlock(&rcv->read_lock);
-#else
-	SBUF_UNLOCK(&rcv->read_lock);
-#endif
-	if (TCP_SEQ_LEQ(cur_stream->rcv_nxt, prev_rcv_nxt)) {
-		return 0;
-	}
+	rcv->rcv_wnd = rcv->recvbuf->size - rcv->recvbuf->cum_len;
 
-	if (cur_stream->state == NTY_TCP_ESTABLISHED) {
+	if (cur_stream->state == CMT_TCP_ESTABLISHED) {
 		//RaiseReadEvent
 		//cur_stream->s
 		if (cur_stream->s) {
 			// && (cur_stream->s->epoll & NTY_EPOLLIN)
 			// should move to epoll for check epoll type
 			//AddtoEpollEvent
-#if NTY_ENABLE_EPOLL_RB
-			if (tcp->ep) {
-				epoll_event_callback(tcp->ep, cur_stream->s->id, NTY_EPOLLIN);
-			}
-
-#else
-			nty_epoll_add_event(tcp->ep, NTY_EVENT_QUEUE, cur_stream->s, NTY_EPOLLIN);
-#endif
 			if (!(cur_stream->s->opts & NTY_TCP_NONBLOCK)) {
 				nty_tcp_flush_read_event(rcv);
 			}
@@ -1084,43 +1070,46 @@ static int nty_tcp_process_payload(nty_tcp_manager* tcp, nty_tcp_stream* cur_str
 	return 1;
 }
 
-static int nty_tcp_process_rst(nty_tcp_manager* tcp, nty_tcp_stream* cur_stream, uint32_t ack_seq) {
-	nty_trace_tcp("Stream %d: TCP RESET (%d)\n",
+static int 
+cmt_tcp_process_rst(cmttcp_manager_per_cpu_t* tcp, cmt_tcp_stream_t* cur_stream, uint32_t ack_seq) {
+	trace_message(stdout, tcp->ctx->cpu, tcp->ctx->tid,
+		"Stream %d: TCP RESET (%d)\n",
 		cur_stream->id, cur_stream->state);
 
-	if (cur_stream->state <= NTY_TCP_SYN_SENT) return 0;
+	if (cur_stream->state <= CMT_TCP_SYN_SENT) return 0;
 
-	if (cur_stream->state == NTY_TCP_SYN_RCVD) {
+	if (cur_stream->state == CMT_TCP_SYN_RCVD) {
 		if (ack_seq == cur_stream->snd_nxt) {
-			cur_stream->state = NTY_TCP_CLOSED;
+			cur_stream->state = CMT_TCP_CLOSED;
 			cur_stream->close_reason = TCP_RESET;
-			DestroyTcpStream(tcp, cur_stream);
+			stream_destroy(tcp, cur_stream);
 		}
 		return 1;
 	}
 
-	if (cur_stream->state == NTY_TCP_FIN_WAIT_1 ||
-		cur_stream->state == NTY_TCP_FIN_WAIT_2 ||
-		cur_stream->state == NTY_TCP_LAST_ACK ||
-		cur_stream->state == NTY_TCP_CLOSING ||
-		cur_stream->state == NTY_TCP_TIME_WAIT) {
-		cur_stream->state = NTY_TCP_CLOSED;
+	if (cur_stream->state == CMT_TCP_FIN_WAIT_1 ||
+		cur_stream->state == CMT_TCP_FIN_WAIT_2 ||
+		cur_stream->state == CMT_TCP_LAST_ACK ||
+		cur_stream->state == CMT_TCP_CLOSING ||
+		cur_stream->state == CMT_TCP_TIME_WAIT) {
+		cur_stream->state = CMT_TCP_CLOSED;
 		cur_stream->close_reason = TCP_ACTIVE_CLOSE;
-		DestroyTcpStream(tcp, cur_stream);
+		stream_destroy(tcp, cur_stream);
 
 		return 1;
 	}
 
-	if (cur_stream->state >= NTY_TCP_ESTABLISHED &&
-		cur_stream->state <= NTY_TCP_CLOSE_WAIT) {
-		nty_trace_tcp("Stream %d: Notifying connection reset.\n", cur_stream->id);
+	if (cur_stream->state >= CMT_TCP_ESTABLISHED &&
+		cur_stream->state <= CMT_TCP_CLOSE_WAIT) {
+		trace_message(stdout, tcp->ctx->cpu, tcp->ctx->tid,
+			"Stream %d: Notifying connection reset.\n", cur_stream->id);
 	}
 
 	if (!(cur_stream->snd->on_closeq ||
-		cur_stream->snd->on_closeq_int ||
-		cur_stream->snd->on_resetq ||
-		cur_stream->snd->on_resetq_int)) {
-		cur_stream->state = NTY_TCP_CLOSE_WAIT;
+		cur_stream->sndvar->on_closeq_int ||
+		cur_stream->sndvar->on_resetq ||
+		cur_stream->sndvar->on_resetq_int)) {
+		cur_stream->state = CMT_TCP_CLOSE_WAIT;
 		cur_stream->close_reason = TCP_RESET;
 		//close event
 	}
@@ -1128,10 +1117,11 @@ static int nty_tcp_process_rst(nty_tcp_manager* tcp, nty_tcp_stream* cur_stream,
 	return 1;
 }
 
-static void nty_tcp_process_ack(nty_tcp_manager* tcp, nty_tcp_stream* cur_stream, uint32_t cur_ts,
+static void 
+cmt_tcp_process_ack(cmttcp_manager_per_cpu_t* tcp, cmt_tcp_stream_t* cur_stream, uint32_t cur_ts,
 	struct tcphdr* tcph, uint32_t seq, uint32_t ack_seq, uint16_t window, int payloadlen) {
 
-	nty_tcp_send* snd = cur_stream->snd;
+	cmt_tcp_send_t* snd = cur_stream->sndvar;
 
 	uint32_t cwindow = window;
 
@@ -1140,11 +1130,11 @@ static void nty_tcp_process_ack(nty_tcp_manager* tcp, nty_tcp_stream* cur_stream
 	}
 
 	uint32_t right_wnd_edge = snd->peer_wnd + cur_stream->rcv->snd_wl1;
-	if (cur_stream->state == NTY_TCP_FIN_WAIT_1 ||
-		cur_stream->state == NTY_TCP_FIN_WAIT_2 ||
-		cur_stream->state == NTY_TCP_CLOSING ||
-		cur_stream->state == NTY_TCP_CLOSE_WAIT ||
-		cur_stream->state == NTY_TCP_LAST_ACK) {
+	if (cur_stream->state == CMT_TCP_FIN_WAIT_1 ||
+		cur_stream->state == CMT_TCP_FIN_WAIT_2 ||
+		cur_stream->state == CMT_TCP_CLOSING ||
+		cur_stream->state == CMT_TCP_CLOSE_WAIT ||
+		cur_stream->state == CMT_TCP_LAST_ACK) {
 
 		if (snd->is_fin_sent && ack_seq == snd->fss + 1)
 			ack_seq--;
@@ -1152,7 +1142,8 @@ static void nty_tcp_process_ack(nty_tcp_manager* tcp, nty_tcp_stream* cur_stream
 
 	if (TCP_SEQ_GT(ack_seq, snd->sndbuf->head_seq + snd->sndbuf->len)) {
 		//char *state_str = TCPStateToString(cur_stream);
-		nty_trace_tcp("Stream %d (%d): invalid acknologement. ack_seq: %u, possible max_ack_seq: %u\n",
+		trace_message(stdout, tcp->ctx->cpu, tcp->ctx->tid,
+			"Stream %d (%d): invalid acknologement. ack_seq: %u, possible max_ack_seq: %u\n",
 			cur_stream->id, cur_stream->state, ack_seq,
 			snd->sndbuf->head_seq + snd->sndbuf->len);
 
@@ -1160,10 +1151,10 @@ static void nty_tcp_process_ack(nty_tcp_manager* tcp, nty_tcp_stream* cur_stream
 	}
 
 	uint32_t cwindow_prev;
-	if (TCP_SEQ_LT(cur_stream->rcv->snd_wl1, seq) ||
-		(cur_stream->rcv->snd_wl1 == seq &&
-			TCP_SEQ_LT(cur_stream->rcv->snd_wl2, ack_seq)) ||
-		(cur_stream->rcv->snd_wl2 == ack_seq &&
+	if (TCP_SEQ_LT(cur_stream->rcvvar->snd_wl1, seq) ||
+		(cur_stream->rcvvar->snd_wl1 == seq &&
+			TCP_SEQ_LT(cur_stream->rcvvar->snd_wl2, ack_seq)) ||
+		(cur_stream->rcvvar->snd_wl2 == ack_seq &&
 			cwindow > snd->peer_wnd)) {
 		cwindow_prev = snd->peer_wnd;
 		snd->peer_wnd = cwindow;
@@ -1172,22 +1163,23 @@ static void nty_tcp_process_ack(nty_tcp_manager* tcp, nty_tcp_stream* cur_stream
 
 		if (cwindow_prev < cur_stream->snd_nxt - snd->snd_una &&
 			snd->peer_wnd >= cur_stream->snd_nxt - snd->snd_una) {
-			nty_trace_tcp("%u Broadcasting client window update! "
+			trace_message(stdout, tcp->ctx->cpu, tcp->ctx->tid,
+				"%u Broadcasting client window update! "
 				"ack_seq: %u, peer_wnd: %u (before: %u), "
 				"(snd_nxt - snd_una: %u)\n",
 				cur_stream->id, ack_seq, snd->peer_wnd, cwindow_prev,
 				cur_stream->snd_nxt - snd->snd_una);
 			//RaiseWriteEvent(mtcp, cur_stream);
-			nty_tcp_flush_send_event(snd);
+			
 		}
 	}
 
 	uint8_t dup = 0;
 	if (TCP_SEQ_LT(ack_seq, cur_stream->snd_nxt)) {
-		if (ack_seq == cur_stream->rcv->last_ack_seq && payloadlen == 0) {
-			if (cur_stream->rcv->snd_wl2 + snd->peer_wnd == right_wnd_edge) {
-				if (cur_stream->rcv->dup_acks + 1 > cur_stream->rcv->dup_acks) {
-					cur_stream->rcv->dup_acks++;
+		if (ack_seq == cur_stream->rcvvar->last_ack_seq && payloadlen == 0) {
+			if (cur_stream->rcvvar->snd_wl2 + snd->peer_wnd == right_wnd_edge) {
+				if (cur_stream->rcvvar->dup_acks + 1 > cur_stream->rcvvar->dup_acks) {
+					cur_stream->rcvvar->dup_acks++;
 				}
 				dup = 1;
 			}
@@ -1195,18 +1187,21 @@ static void nty_tcp_process_ack(nty_tcp_manager* tcp, nty_tcp_stream* cur_stream
 	}
 
 	if (!dup) {
-		cur_stream->rcv->dup_acks = 0;
-		cur_stream->rcv->last_ack_seq = ack_seq;
+		cur_stream->rcvvar->dup_acks = 0;
+		cur_stream->rcvvar->last_ack_seq = ack_seq;
 	}
 
-	if (dup && cur_stream->rcv->dup_acks == 3) {
-		nty_trace_tcp("Triple duplicated ACKs!! ack_seq: %u\n", ack_seq);
+	if (dup && cur_stream->rcvvar->dup_acks == 3) {
+		trace_message(stdout, tcp->ctx->cpu, tcp->ctx->tid, ,
+			"Triple duplicated ACKs!! ack_seq: %u\n", ack_seq);
 		if (TCP_SEQ_LT(ack_seq, cur_stream->snd_nxt)) {
-			nty_trace_tcp("Reducing snd_nxt from %u to %u\n",
+			trace_message(stdout, tcp->ctx->cpu, tcp->ctx->tid, 
+				"Reducing snd_nxt from %u to %u\n",
 				cur_stream->snd_nxt, ack_seq);
 
 			if (ack_seq != snd->snd_una) {
-				nty_trace_tcp("ack_seq and snd_una mismatch on tdp ack. "
+				trace_message(stdout, tcp->ctx->cpu, tcp->ctx->tid, 
+					"ack_seq and snd_una mismatch on tdp ack. "
 					"ack_seq: %u, snd_una: %u\n",
 					ack_seq, snd->snd_una);
 			}
@@ -1218,32 +1213,36 @@ static void nty_tcp_process_ack(nty_tcp_manager* tcp, nty_tcp_stream* cur_stream
 			snd->ssthresh = 2 * snd->mss;
 		}
 		snd->cwnd = snd->ssthresh + 3 * snd->mss;
-		nty_trace_tcp("Fast retransmission. cwnd: %u, ssthresh: %u\n",
+		trace_message(stdout, tcp->ctx->cpu, tcp->ctx->tid, 
+			"Fast retransmission. cwnd: %u, ssthresh: %u\n",
 			snd->cwnd, snd->ssthresh);
 
 		if (snd->nrtx < TCP_MAX_RTX) {
 			snd->nrtx++;
 		}
 		else {
-			nty_trace_tcp("Exceed MAX_RTX. \n");
+			trace_message(stdout, tcp->ctx->cpu, tcp->ctx->tid, 
+				"Exceed MAX_RTX. \n");
 		}
-		nty_tcp_addto_sendlist(tcp, cur_stream);
+		cmt_tcp_addto_sendlist(tcp, cur_stream);
 	}
-	else if (cur_stream->rcv->dup_acks > 3) {
+	else if (cur_stream->rcvvar->dup_acks > 3) {
 
 		if ((uint32_t)(snd->cwnd + snd->mss) > snd->cwnd) {
 			snd->cwnd += snd->mss;
-			nty_trace_tcp("Dupack cwnd inflate. cwnd: %u, ssthresh: %u\n",
+			trace_message(stdout, tcp->ctx->cpu, tcp->ctx->tid, 
+				"Dupack cwnd inflate. cwnd: %u, ssthresh: %u\n",
 				snd->cwnd, snd->ssthresh);
 		}
 	}
 
 	if (TCP_SEQ_GT(ack_seq, cur_stream->snd_nxt)) {
-		nty_trace_tcp("Updating snd_nxt from %u to %u\n",
+		trace_message(stdout, tcp->ctx->cpu, tcp->ctx->tid, 
+			"Updating snd_nxt from %u to %u\n",
 			cur_stream->snd_nxt, ack_seq);
 		cur_stream->snd_nxt = ack_seq;
 		if (snd->sndbuf->len == 0) {
-			nty_tcp_remove_sendlist(tcp, cur_stream);
+			cmt_tcp_remove_sendlist(tcp, cur_stream);
 		}
 	}
 
@@ -1258,20 +1257,22 @@ static void nty_tcp_process_ack(nty_tcp_manager* tcp, nty_tcp_stream* cur_stream
 			packets++;
 		}
 		if (cur_stream->saw_timestamp) {
-			nty_tcp_estimate_rtt(tcp, cur_stream, cur_ts - cur_stream->rcv->ts_lastack_rcvd);
+			cmt_tcp_estimate_rtt(tcp, cur_stream, cur_ts - cur_stream->rcv->ts_lastack_rcvd);
 			snd->rto = (cur_stream->rcv->srtt >> 3) + cur_stream->rcv->rttvar;
 			assert(snd->rto > 0);
 		}
 		else {
-			nty_trace_tcp("not implemented.\n");
+			trace_tcp(stdout, tcp->ctx->cpu, tcp->ctx->tid, 
+				"not implemented.\n");
 		}
 
-		if (cur_stream->state >= NTY_TCP_ESTABLISHED) {
+		if (cur_stream->state >= CMT_TCP_ESTABLISHED) {
 			if (snd->cwnd < snd->ssthresh) {
 				if ((snd->cwnd + snd->mss) > snd->cwnd) {
 					snd->cwnd += snd->mss * packets;
 				}
-				nty_trace_tcp("slow start cwnd : %u, ssthresh: %u\n",
+				trace_message(stdout, tcp->ctx->cpu, tcp->ctx->tid, 
+					"slow start cwnd : %u, ssthresh: %u\n",
 					snd->cwnd, snd->ssthresh);
 			}
 		}
@@ -1281,13 +1282,8 @@ static void nty_tcp_process_ack(nty_tcp_manager* tcp, nty_tcp_stream* cur_stream
 				snd->cwnd = new_cwnd;
 			}
 		}
-		if (pthread_mutex_lock(&snd->write_lock)) {
-			if (errno == EDEADLK) {
-				perror("ProcessACK: write_lock blocked\n");
-			}
-			assert(0);
-		}
-		int ret = SBRemove(tcp->rbm_snd, snd->sndbuf, rmlen);
+		
+		int ret = sb_remove(tcp->rbm_snd, snd->sndbuf, rmlen);
 		if (ret <= 0) return;
 
 		snd->snd_una = ack_seq;
@@ -1296,17 +1292,19 @@ static void nty_tcp_process_ack(nty_tcp_manager* tcp, nty_tcp_stream* cur_stream
 
 		if (snd_wnd_prev <= 0) {
 			//Raise Write Event
-			nty_tcp_flush_send_event(snd);
+			
 		}
 
-		pthread_mutex_unlock(&snd->write_lock);
-		UpdateRetransmissionTimer(tcp, cur_stream, cur_ts);
+		
+		update_retransmission_timer(tcp, cur_stream, cur_ts);
 	}
 
 }
 
 
-int nty_tcp_process(nty_nic_context* ctx, unsigned char* stream) {
+int 
+cmt_tcp_process(cmttcp_manager_per_cpu_t* tcp, 
+	unsigned char* stream) {
 
 	struct iphdr* iph = (struct iphdr*)(stream + sizeof(struct ethhdr));
 	struct tcphdr* tcph = (struct tcphdr*)(stream + sizeof(struct ethhdr) + sizeof(struct iphdr));
@@ -1319,11 +1317,12 @@ int nty_tcp_process(nty_nic_context* ctx, unsigned char* stream) {
 	int payloadlen = tcp_len - (tcph->doff << 2);
 
 	//unsigned short check = in_cksum((unsigned short*)tcph, tcp_len);
-	unsigned short check = nty_tcp_calculate_checksum((uint16_t*)tcph, tcp_len, iph->saddr, iph->daddr);
-	nty_trace_tcp("check : %x, orgin : %x, payloadlen:%d\n", check, tcph->check, payloadlen);
+	unsigned short check = cmt_tcp_calculate_checksum((uint16_t*)tcph, tcp_len, iph->saddr, iph->daddr);
+	trace_message(stdout, tcp->ctx->cpu, tcp->ctx->tid,
+		"check : %x, orgin : %x, payloadlen:%d\n", check, tcph->check, payloadlen);
 	if (check) return -1;
 
-	nty_tcp_stream tstream = { 0 };
+	cmt_tcp_stream_t tstream = { 0 };
 #if 1
 	tstream.saddr = iph->daddr;
 	tstream.sport = tcph->dest;
@@ -1345,110 +1344,115 @@ int nty_tcp_process(nty_nic_context* ctx, unsigned char* stream) {
 	uint16_t window = ntohs(tcph->window);
 
 
-	nty_trace_tcp("saddr:0x%x,sport:%d,daddr:0x%x,dport:%d, seq:%d, ack_seq:%d\n",
+	trace_message(stdout, tcp->ctx->cpu, tcp->ctx->tid, 
+		"saddr:0x%x,sport:%d,daddr:0x%x,dport:%d, seq:%d, ack_seq:%d\n",
 		iph->daddr, ntohs(tcph->dest), iph->saddr, ntohs(tcph->source),
 		seq, ack_seq);
 
-	nty_tcp_stream* cur_stream = (nty_tcp_stream*)StreamHTSearch(nty_tcp->tcp_flow_table, &tstream);
+	cmt_tcp_stream_t* cur_stream = (cmt_tcp_stream_t*)stream_ht_search(tcp->tcp_flow_table, &tstream);
 	if (cur_stream == NULL) {
-		cur_stream = nty_create_stream(nty_tcp, ts, iph, ip_len, tcph, seq, ack_seq, payloadlen, window);
-		if (!cur_stream) {
+		cur_stream = cmt_create_stream(tcp, ts, iph, ip_len, tcph, seq, ack_seq, payloadlen, window);
+		if (unlikely(!cur_stream)) {
+			trace_error(stderr, tcp->ctx->cpu, tcp->ctx->tid,
+				"failed to create a stream");
 			return -2;
 		}
 	}
 	int ret = 0;
-	if (cur_stream->state > NTY_TCP_SYN_RCVD) {
-		ret = nty_tcp_validseq(nty_tcp, cur_stream, ts, tcph, seq, ack_seq, payloadlen);
+	if (cur_stream->state > CMT_TCP_SYN_RCVD) {
+		ret = cmt_tcp_validseq(tcp, cur_stream, ts, tcph, seq, ack_seq, payloadlen);
 		if (!ret) {
-			nty_trace_tcp("Stream %d: Unexpected sequence: %u, expected: %u\n",
+			trace_message(stdout, tcp->ctx->cpu, tcp->ctx->tid, 
+				"Stream %d: Unexpected sequence: %u, expected: %u\n",
 				cur_stream->id, seq, cur_stream->rcv_nxt);
 			return 1;
 		}
 	}
 
-	nty_trace_tcp("nty_tcp_process state : %d\n", cur_stream->state);
+	trace_message(stdout, tcp->ctx->cpu, tcp->ctx->tid, 
+		"cmt_tcp_process state : %d\n", cur_stream->state);
 
 	if (tcph->syn) {
-		cur_stream->snd->peer_wnd = window;
+		cur_stream->sndvar->peer_wnd = window;
 	}
 	else {
-		cur_stream->snd->peer_wnd = (uint32_t)window << cur_stream->snd->wscale_peer;
+		cur_stream->sndvar->peer_wnd = (uint32_t)window << cur_stream->sndvar->wscale_peer;
 	}
 
 	cur_stream->last_active_ts = ts;
-	UpdateTimeoutList(nty_tcp, cur_stream);
+	update_timeout_list(tcp, cur_stream);
 
 	if (tcph->rst) {
 		cur_stream->have_reset = 1;
-		if (cur_stream->state > NTY_TCP_SYN_SENT) {
-			if (nty_tcp_process_rst(nty_tcp, cur_stream, ack_seq)) {
+		if (cur_stream->state > CMT_TCP_SYN_SENT) {
+			if (cmt_tcp_process_rst(tcp, cur_stream, ack_seq)) {
 				return 1;
 			}
 		}
 	}
 
 	switch (cur_stream->state) {
-	case NTY_TCP_LISTEN: {
-		nty_tcp_handle_listen(nty_tcp, ts, cur_stream, tcph);
+	case CMT_TCP_LISTEN: {
+		cmt_tcp_handle_listen(tcp, ts, cur_stream, tcph);
 		break;
 	}
-	case NTY_TCP_SYN_SENT: {
-		nty_tcp_handle_syn_sent(nty_tcp, ts, cur_stream, iph, tcph, seq,
+	case CMT_TCP_SYN_SENT: {
+		cmt_tcp_handle_syn_sent(tcp, ts, cur_stream, iph, tcph, seq,
 			ack_seq, payloadlen, window);
 		break;
 	}
-	case NTY_TCP_SYN_RCVD: {
+	case CMT_TCP_SYN_RCVD: {
 		if (tcph->syn && seq == cur_stream->rcv->irs) {
-			nty_tcp_handle_listen(nty_tcp, ts, cur_stream, tcph);
+			cmt_tcp_handle_listen(tcp, ts, cur_stream, tcph);
 		}
 		else {
-			nty_tcp_handle_syn_rcvd(nty_tcp, ts, cur_stream, tcph, ack_seq);
+			cmt_tcp_handle_syn_rcvd(tcp, ts, cur_stream, tcph, ack_seq);
 			if (payloadlen > 0 && cur_stream->state == NTY_TCP_ESTABLISHED) {
-				nty_tcp_handle_established(nty_tcp, ts, cur_stream, tcph, seq, ack_seq,
+				cmt_tcp_handle_established(tcp, ts, cur_stream, tcph, seq, ack_seq,
 					payload, payloadlen, window);
 			}
 		}
 		break;
 	}
-	case NTY_TCP_ESTABLISHED: {
-		nty_tcp_handle_established(nty_tcp, ts, cur_stream, tcph, seq, ack_seq,
+	case CMT_TCP_ESTABLISHED: {
+		cmt_tcp_handle_established(tcp, ts, cur_stream, tcph, seq, ack_seq,
 			payload, payloadlen, window);
 		break;
 	}
-	case NTY_TCP_CLOSE_WAIT: {
-		nty_tcp_handle_close_wait(nty_tcp, ts, cur_stream, tcph, seq, ack_seq,
+	case CMT_TCP_CLOSE_WAIT: {
+		cmt_tcp_handle_close_wait(tcp, ts, cur_stream, tcph, seq, ack_seq,
 			payloadlen, window);
 		break;
 	}
-	case NTY_TCP_LAST_ACK: {
-		nty_tcp_handle_last_ack(nty_tcp, ts, iph, ip_len, cur_stream, tcph,
+	case CMT_TCP_LAST_ACK: {
+		cmt_tcp_handle_last_ack(tcp, ts, iph, ip_len, cur_stream, tcph,
 			seq, ack_seq, payloadlen, window);
 		break;
 	}
-	case NTY_TCP_FIN_WAIT_1: {
-		nty_tcp_handle_fin_wait_1(nty_tcp, ts, cur_stream, tcph, seq, ack_seq,
+	case CMT_TCP_FIN_WAIT_1: {
+		cmt_tcp_handle_fin_wait_1(tcp, ts, cur_stream, tcph, seq, ack_seq,
 			payload, payloadlen, window);
 		break;
 	}
-	case NTY_TCP_FIN_WAIT_2: {
-		nty_tcp_handle_fin_wait_2(nty_tcp, ts, cur_stream, tcph, seq, ack_seq,
+	case CMT_TCP_FIN_WAIT_2: {
+		cmt_tcp_handle_fin_wait_2(tcp, ts, cur_stream, tcph, seq, ack_seq,
 			payload, payloadlen, window);
 		break;
 	}
-	case NTY_TCP_CLOSING: {
-		nty_tcp_handle_closing(nty_tcp, ts, cur_stream, tcph, seq, ack_seq,
+	case CMT_TCP_CLOSING: {
+		cmt_tcp_handle_closing(cmt_tcp, ts, cur_stream, tcph, seq, ack_seq,
 			payloadlen, window);
 		break;
 	}
-	case NTY_TCP_TIME_WAIT: {
+	case CMT_TCP_TIME_WAIT: {
 		if (cur_stream->on_timewait_list) {
-			RemoveFromTimewaitList(nty_tcp, cur_stream);
-			AddtoTimewaitList(nty_tcp, cur_stream, ts);
+			remove_from_timewait_list(tcp, cur_stream);
+			add_to_timewait_list(tcp, cur_stream, ts);
 		}
-		nty_tcp_addto_controllist(nty_tcp, cur_stream);
+		cmt_tcp_addto_controllist(nty_tcp, cur_stream);
 		break;
 	}
-	case NTY_TCP_CLOSED: {
+	case CMT_TCP_CLOSED: {
 		break;
 	}
 	}

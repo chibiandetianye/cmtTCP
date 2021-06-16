@@ -358,7 +358,7 @@ check_rtm_timeout(cmttcp_manager_per_cpu_t* tcp, uint32_t cur_ts, int thresh) {
 		for (walk = tailq_first(rto_list); walk != NULL; walk = next) {
 			if (++cnt > thresh) break;
 
-			next = TAILQ_NEXT(walk, snd->timer_link);
+			next = tailq_next(walk->sndvar->timer_link);
 
 			if (walk->on_rto_idx >= 0) {
 				tailq_remove(rto_list, walk);
